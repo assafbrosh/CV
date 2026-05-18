@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Year 9 Physics Exam Prep</title>
+<title>Science Exam Prep</title>
 <style>
   :root {
     --primary: #1a73e8;
@@ -200,6 +200,32 @@
   .walkthrough ol { margin-top: .5rem; padding-left: 1.3rem; }
   .walkthrough ol li { font-size: .93rem; line-height: 1.6; margin-bottom: .3rem; }
 
+  /* Skip button */
+  .skip-btn {
+    background: transparent; color: var(--muted);
+    border: 1.5px solid var(--border); border-radius: 8px;
+    padding: .55rem 1.2rem; font-size: .88rem; cursor: pointer;
+    transition: all .2s;
+  }
+  .skip-btn:hover { border-color: var(--primary); color: var(--primary); }
+
+  /* Topic switcher */
+  #topic-switcher {
+    display: flex; flex-wrap: wrap; gap: .5rem;
+    margin-bottom: 1.2rem;
+  }
+  .ts-btn {
+    background: var(--card); border: 1.5px solid var(--border);
+    border-radius: 99px; padding: .35rem .9rem;
+    font-size: .82rem; cursor: pointer; transition: all .2s;
+    display: flex; align-items: center; gap: .3rem;
+  }
+  .ts-btn:hover { border-color: var(--primary); color: var(--primary); }
+  .ts-btn.ts-active { border-color: var(--primary); background: #e8f0fe; color: var(--primary); font-weight: 600; }
+  .ts-btn.ts-done  { border-color: var(--success); background: #e6f4ea; color: var(--success); }
+  .ts-btn.ts-wrong { border-color: var(--danger);  background: #fce8e6; color: var(--danger); }
+  .ts-label { font-size: .75rem; color: var(--muted); margin-bottom: .4rem; }
+
   /* Next button */
   .next-btn {
     background: var(--primary); color: white; border: none;
@@ -214,6 +240,36 @@
     font-size: .88rem; color: var(--warn); font-weight: 600;
     border: 1px dashed #ffcc02;
   }
+
+  /* Topic grade card */
+  .topic-grade-card {
+    background: var(--card); border-radius: 16px;
+    padding: 2rem; box-shadow: 0 2px 12px rgba(0,0,0,.1);
+    text-align: center; animation: fadeIn .35s ease;
+  }
+  .topic-grade-card .tg-icon { font-size: 3rem; }
+  .topic-grade-card h2 { font-size: 1.4rem; margin: .5rem 0 .2rem; }
+  .topic-grade-card .tg-sub { color: var(--muted); font-size: .9rem; margin-bottom: 1.2rem; }
+  .grade-ring {
+    width: 110px; height: 110px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 1.2rem;
+    font-size: 1.8rem; font-weight: 800;
+  }
+  .grade-ring.grade-a { background: #e6f4ea; color: var(--success); border: 4px solid var(--success); }
+  .grade-ring.grade-b { background: #e8f0fe; color: var(--primary); border: 4px solid var(--primary); }
+  .grade-ring.grade-c { background: #fff3e0; color: var(--warn);    border: 4px solid var(--warn); }
+  .grade-ring.grade-d { background: #fce8e6; color: var(--danger);  border: 4px solid var(--danger); }
+  .tg-stats {
+    display: flex; justify-content: center; gap: 2rem;
+    margin-bottom: 1.2rem;
+  }
+  .tg-stat .tg-num { font-size: 1.6rem; font-weight: 700; }
+  .tg-stat .tg-lbl { font-size: .8rem; color: var(--muted); }
+  .tg-stat.tg-c .tg-num { color: var(--success); }
+  .tg-stat.tg-w .tg-num { color: var(--danger); }
+  .tg-msg { font-size: .95rem; color: var(--muted); margin-bottom: 1.4rem; }
+  .ts-score { font-size: .7rem; font-weight: 700; margin-left: .2rem; }
 
   /* Results */
   #results-screen { display: none; text-align: center; }
@@ -241,11 +297,153 @@
   }
   .restart-btn:hover { background: #1557b0; }
 
+  /* Review badge */
+  .review-label {
+    display: inline-block; background: #fce8e6; color: var(--danger);
+    border: 1px dashed var(--danger); border-radius: 8px;
+    padding: .4rem .9rem; font-size: .85rem; font-weight: 600;
+    margin-bottom: .8rem;
+  }
+  .review-btn {
+    background: #fce8e6; color: var(--danger);
+    border: 1.5px solid var(--danger); border-radius: 8px;
+    padding: .6rem 1.4rem; font-size: .9rem; font-weight: 600;
+    cursor: pointer; transition: all .2s; margin-right: .6rem;
+    margin-top: .6rem;
+  }
+  .review-btn:hover { background: var(--danger); color: white; }
+
+  /* Modal overlay */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,.5); z-index: 1000;
+    align-items: flex-start; justify-content: center;
+    padding: 2rem 1rem; overflow-y: auto;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: white; border-radius: 16px;
+    width: 100%; max-width: 620px;
+    padding: 2rem; box-shadow: 0 8px 32px rgba(0,0,0,.2);
+    position: relative; animation: fadeIn .25s ease;
+  }
+  .modal h2 { font-size: 1.3rem; margin-bottom: 1.4rem; color: var(--primary); }
+  .modal-close {
+    position: absolute; top: 1rem; right: 1rem;
+    background: none; border: none; font-size: 1.4rem;
+    cursor: pointer; color: var(--muted); line-height: 1;
+  }
+  .form-row { margin-bottom: 1rem; }
+  .form-row label { display: block; font-size: .85rem; font-weight: 600; margin-bottom: .3rem; color: var(--muted); }
+  .form-row input, .form-row select, .form-row textarea {
+    width: 100%; border: 1.5px solid var(--border); border-radius: 8px;
+    padding: .65rem .9rem; font-size: .95rem; font-family: inherit;
+    transition: border-color .2s;
+  }
+  .form-row input:focus, .form-row select:focus, .form-row textarea:focus {
+    outline: none; border-color: var(--primary);
+  }
+  .form-row textarea { min-height: 70px; resize: vertical; }
+  .form-row.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem; }
+  .q-list { list-style: none; margin-bottom: 1rem; }
+  .q-list li {
+    display: flex; align-items: center; gap: .6rem;
+    background: var(--bg); border-radius: 8px; padding: .55rem .8rem;
+    font-size: .88rem; margin-bottom: .4rem;
+  }
+  .q-list li .q-num { font-weight: 700; color: var(--primary); min-width: 1.4rem; }
+  .q-list li .del-q { margin-left: auto; background: none; border: none; color: var(--danger); cursor: pointer; font-size: 1rem; }
+  .add-q-btn {
+    background: var(--bg); border: 1.5px dashed var(--border);
+    border-radius: 8px; padding: .65rem; width: 100%;
+    font-size: .9rem; cursor: pointer; color: var(--primary);
+    transition: all .2s; margin-bottom: 1rem;
+  }
+  .add-q-btn:hover { border-color: var(--primary); background: #e8f0fe; }
+  .q-form-box {
+    background: #f0f4ff; border-radius: 10px; padding: 1rem;
+    margin-bottom: 1rem; border: 1px solid #c5d8ff;
+  }
+  .q-form-box h4 { font-size: .9rem; color: var(--primary); margin-bottom: .8rem; }
+  .save-q-btn {
+    background: var(--primary); color: white; border: none;
+    border-radius: 8px; padding: .55rem 1.2rem; font-size: .9rem;
+    cursor: pointer; margin-right: .5rem;
+  }
+  .cancel-q-btn {
+    background: none; border: 1.5px solid var(--border); color: var(--muted);
+    border-radius: 8px; padding: .55rem 1.2rem; font-size: .9rem; cursor: pointer;
+  }
+  .modal-actions { display: flex; gap: .8rem; margin-top: 1.2rem; flex-wrap: wrap; }
+  .modal-save-btn {
+    background: var(--primary); color: white; border: none;
+    border-radius: 8px; padding: .75rem 2rem;
+    font-size: 1rem; font-weight: 600; cursor: pointer; flex: 1;
+  }
+  .modal-cancel-btn {
+    background: none; border: 1.5px solid var(--border); color: var(--muted);
+    border-radius: 8px; padding: .75rem 1.5rem;
+    font-size: 1rem; cursor: pointer;
+  }
+  .add-subject-btn {
+    background: none; border: 2px dashed var(--border);
+    border-radius: 12px; padding: 1.2rem; cursor: pointer;
+    color: var(--primary); font-size: .9rem; font-weight: 600;
+    width: 100%; transition: all .2s; margin-top: .5rem;
+  }
+  .add-subject-btn:hover { border-color: var(--primary); background: #e8f0fe; }
+
   @media (max-width: 600px) {
     header { padding: 1rem; }
     .card { padding: 1.3rem; }
     .q-text { font-size: 1rem; }
     .big-score { font-size: 3rem; }
+    .form-row.row2 { grid-template-columns: 1fr; }
+  }
+
+  /* Profile screen */
+  #profile-screen { text-align: center; }
+  #profile-screen > h2 { font-size: 1.6rem; margin-bottom: .4rem; }
+  #profile-screen > p { color: var(--muted); margin-bottom: 2rem; }
+  .profile-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 1rem; margin-bottom: 1rem;
+  }
+  .profile-card {
+    background: var(--card); border: 2px solid var(--border);
+    border-radius: 16px; padding: 1.4rem 1rem 1rem;
+    cursor: pointer; transition: all .2s; text-align: center;
+    position: relative;
+  }
+  .profile-card:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(0,0,0,.12); }
+  .profile-card.add-profile-card { border-style: dashed; color: var(--primary); }
+  .profile-card.add-profile-card:hover { border-color: var(--primary); background: #e8f0fe; }
+  .profile-avatar { font-size: 3rem; margin-bottom: .5rem; }
+  .profile-name { font-size: 1.05rem; font-weight: 700; }
+  .profile-age { font-size: .8rem; color: var(--muted); margin-top: .2rem; }
+  .profile-card-actions { position: absolute; top: .5rem; right: .5rem; display: flex; gap: .2rem; }
+  .profile-card-actions button { background: none; border: none; cursor: pointer; font-size: .9rem; opacity: .5; }
+  .profile-card-actions button:hover { opacity: 1; }
+  .profile-color-bar { height: 4px; border-radius: 99px; margin-top: .8rem; }
+  /* Avatar picker */
+  .avatar-picker { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .4rem; }
+  .avatar-opt { font-size: 1.6rem; cursor: pointer; padding: .3rem; border-radius: 8px; border: 2px solid transparent; transition: all .15s; }
+  .avatar-opt.selected { border-color: var(--primary); background: #e8f0fe; }
+  /* Color picker */
+  .color-picker { display: flex; gap: .6rem; flex-wrap: wrap; margin-top: .4rem; }
+  .color-swatch { width: 32px; height: 32px; border-radius: 50%; cursor: pointer; border: 3px solid transparent; transition: all .15s; }
+  .color-swatch.selected { border-color: var(--text); transform: scale(1.15); }
+  /* Switch profile btn */
+  #switch-profile-btn {
+    background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.35);
+    color: white; border-radius: 8px; padding: .45rem 1rem;
+    font-size: .85rem; cursor: pointer; transition: background .2s;
+  }
+  #switch-profile-btn:hover { background: rgba(255,255,255,.25); }
+  #active-profile-tag {
+    display: flex; align-items: center; gap: .5rem;
+    font-size: .9rem; opacity: .9;
   }
 </style>
 </head>
@@ -253,26 +451,43 @@
 
 <header>
   <div>
-    <h1>Year 9 Physics Exam Prep</h1>
-    <p>MYP 4 — Electric Force, Circuits, Energy, Oscillations &amp; Waves</p>
+    <h1>Science Exam Prep</h1>
+    <div id="active-profile-tag" style="display:none"></div>
   </div>
-  <div id="score-bar">
-    <div>Correct <span class="green" id="hdr-correct">0</span></div>
-    <div>Wrong <span class="red" id="hdr-wrong">0</span></div>
-    <div>Q <span id="hdr-qnum">0</span></div>
+  <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+    <div id="score-bar" style="display:none">
+      <div>Correct <span class="green" id="hdr-correct">0</span></div>
+      <div>Wrong <span class="red" id="hdr-wrong">0</span></div>
+      <div>Q <span id="hdr-qnum">0</span></div>
+    </div>
+    <button id="switch-profile-btn" style="display:none" onclick="showProfileScreen()">Switch Profile</button>
   </div>
 </header>
 
 <main>
+  <!-- PROFILE SELECTION -->
+  <div id="profile-screen">
+    <h2>Who's learning today?</h2>
+    <p>Select your profile to track your progress</p>
+    <div class="profile-grid" id="profile-grid"></div>
+  </div>
+
   <!-- TOPIC SELECTION -->
-  <div id="topic-screen">
-    <h2>Choose topics to practise</h2>
+  <div id="topic-screen" style="display:none">
+    <div style="text-align:left;margin-bottom:1rem;">
+      <a href="#" style="color:var(--muted);font-size:.9rem;text-decoration:none;" onclick="showProfileScreen();return false;">← Back to Profiles</a>
+    </div>
+    <h2 id="topic-screen-h2">Choose topics to practise</h2>
     <div class="topic-grid" id="topic-grid"></div>
+    <button class="add-subject-btn" onclick="openAddSubjectModal()">+ Add Custom Subject</button>
+    <br><br>
     <button id="start-btn" disabled onclick="startQuiz()">Start Practice</button>
   </div>
 
   <!-- QUIZ -->
   <div id="quiz-screen">
+    <div class="ts-label">Jump to topic:</div>
+    <div id="topic-switcher"></div>
     <div class="progress-row">
       <div class="progress-bar-wrap">
         <div class="progress-bar-fill" id="progress-fill" style="width:0%"></div>
@@ -293,10 +508,72 @@
         <div class="rb-item"><div class="rb-num" id="res-pct">0%</div><div class="rb-lbl">Score</div></div>
       </div>
       <p id="res-message" style="color:var(--muted);margin-bottom:1.2rem;"></p>
-      <button class="restart-btn" onclick="location.reload()">Try Again</button>
+      <div id="res-topic-breakdown" style="text-align:left;margin-bottom:1.4rem;"></div>
+      <div style="display:flex;gap:.8rem;flex-wrap:wrap;justify-content:center;">
+        <button class="review-btn" id="res-review-btn" style="display:none" onclick="reviewAllWrong()">Retry Wrong Answers</button>
+        <button class="restart-btn" onclick="showTopicScreen()">Try Again</button>
+      </div>
     </div>
   </div>
 </main>
+
+<!-- ADD SUBJECT MODAL -->
+<div class="modal-overlay" id="add-subject-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeAddSubjectModal()">✕</button>
+    <h2>Add Custom Subject</h2>
+    <div class="form-row row2">
+      <div>
+        <label>Subject Name</label>
+        <input type="text" id="subj-name" placeholder="e.g. Thermodynamics">
+      </div>
+      <div>
+        <label>Icon (emoji)</label>
+        <input type="text" id="subj-icon" placeholder="🔥" maxlength="4">
+      </div>
+    </div>
+    <div class="form-row">
+      <label>Description (optional)</label>
+      <input type="text" id="subj-desc" placeholder="Brief topic description">
+    </div>
+    <label style="font-size:.85rem;font-weight:600;color:var(--muted);display:block;margin-bottom:.4rem;">Questions</label>
+    <ul class="q-list" id="modal-q-list"></ul>
+    <div id="modal-q-form" style="display:none"></div>
+    <button class="add-q-btn" id="add-q-btn" onclick="showAddQuestionForm()">+ Add Question</button>
+    <div class="modal-actions">
+      <button class="modal-cancel-btn" onclick="closeAddSubjectModal()">Cancel</button>
+      <button class="modal-save-btn" onclick="saveCustomSubject()">Save Subject</button>
+    </div>
+  </div>
+</div>
+
+<!-- PROFILE MODAL -->
+<div class="modal-overlay" id="profile-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeProfileModal()">✕</button>
+    <h2 id="profile-modal-title">Add Profile</h2>
+    <div class="form-row">
+      <label>Name</label>
+      <input type="text" id="prof-name" placeholder="e.g. Alex">
+    </div>
+    <div class="form-row">
+      <label>Age / Grade</label>
+      <input type="number" id="prof-age" placeholder="e.g. 14" min="4" max="20">
+    </div>
+    <div class="form-row">
+      <label>Avatar</label>
+      <div class="avatar-picker" id="avatar-picker"></div>
+    </div>
+    <div class="form-row">
+      <label>Colour</label>
+      <div class="color-picker" id="color-picker"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-cancel-btn" onclick="closeProfileModal()">Cancel</button>
+      <button class="modal-save-btn" onclick="saveProfile()">Save</button>
+    </div>
+  </div>
+</div>
 
 <script>
 // ─── QUESTION BANK ────────────────────────────────────────────────────────────
@@ -869,14 +1146,76 @@ const SIMILAR = {
   },
 };
 
+// ── HELPERS ──────────────────────────────────────────────────────────────────
+function fisherYates(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function getUsedIds(topicId) {
+  return JSON.parse(localStorage.getItem(`physPrepUsed_${state.profileId}_${topicId}`) || '[]');
+}
+function markUsed(topicId, qId) {
+  if (!qId) return;
+  const used = getUsedIds(topicId);
+  if (!used.includes(qId)) {
+    used.push(qId);
+    localStorage.setItem(`physPrepUsed_${state.profileId}_${topicId}`, JSON.stringify(used));
+  }
+}
+function resetUsed(topicId) {
+  localStorage.removeItem(`physPrepUsed_${state.profileId}_${topicId}`);
+}
+
+function buildFreshTopicQueue(topicId) {
+  const all = QBANK.filter(q => q.topic === topicId);
+  let used = getUsedIds(topicId);
+  let available = all.filter(q => !used.includes(q.id));
+  if (available.length === 0) {
+    resetUsed(topicId);
+    available = all;
+  }
+  return fisherYates(available);
+}
+
+// ── CUSTOM TOPICS (localStorage) ────────────────────────────────────────────
+function loadCustomTopics() {
+  const raw = localStorage.getItem(`physPrepCustom_${state.profileId}`);
+  if (!raw) return;
+  try {
+    const customs = JSON.parse(raw);
+    customs.forEach(ct => {
+      if (!TOPICS.find(t => t.id === ct.id)) TOPICS.push(ct);
+      ct.questions.forEach(q => {
+        if (!QBANK.find(x => x.id === q.id)) QBANK.push(q);
+      });
+    });
+  } catch(e) {}
+}
+
+function saveCustomTopics() {
+  const customs = TOPICS
+    .filter(t => t._custom)
+    .map(t => ({ ...t, questions: QBANK.filter(q => q.topic === t.id) }));
+  localStorage.setItem(`physPrepCustom_${state.profileId}`, JSON.stringify(customs));
+}
+
 // ── STATE ─────────────────────────────────────────────────────────────────────
 let state = {
+  profileId: null,
   queue: [],
   idx: 0,
   correct: 0,
   wrong: 0,
   awaitingSimilar: false,
   currentSimilar: null,
+  topicStats: {},
+  selectedTopics: [],
+  wrongAnswers: [],      // question objects answered incorrectly this session
 };
 
 // ── TOPIC SCREEN ──────────────────────────────────────────────────────────────
@@ -902,13 +1241,73 @@ function updateStartBtn() {
 
 function startQuiz() {
   const selected = [...document.querySelectorAll('.topic-card.selected')].map(c => c.dataset.id);
-  const qs = QBANK.filter(q => selected.includes(q.topic));
-  // shuffle
-  state.queue = qs.sort(() => Math.random() - .5);
+  const queue = [];
+  selected.forEach(tid => queue.push(...buildFreshTopicQueue(tid)));
+  state.queue = queue;
   state.idx = 0; state.correct = 0; state.wrong = 0;
   state.awaitingSimilar = false; state.currentSimilar = null;
+  state.selectedTopics = selected;
+  state.topicStats = {};
+  state.wrongAnswers = [];
+  selected.forEach(tid => { state.topicStats[tid] = { correct: 0, wrong: 0 }; });
   document.getElementById('topic-screen').style.display = 'none';
   document.getElementById('quiz-screen').style.display = 'block';
+  document.getElementById('score-bar').style.display = '';
+  buildTopicSwitcher(selected);
+  renderQuestion();
+}
+
+function buildTopicSwitcher(selected) {
+  const bar = document.getElementById('topic-switcher');
+  bar.innerHTML = '';
+  TOPICS.filter(t => selected.includes(t.id)).forEach(t => {
+    const btn = document.createElement('button');
+    btn.className = 'ts-btn';
+    btn.dataset.topicId = t.id;
+    btn.innerHTML = `${t.icon} ${t.label}`;
+    btn.onclick = () => jumpToTopic(t.id);
+    bar.appendChild(btn);
+  });
+  updateTopicSwitcher();
+}
+
+function updateTopicSwitcher() {
+  const currentTopic = state.queue[state.idx]?.topic;
+  document.querySelectorAll('.ts-btn').forEach(btn => {
+    btn.classList.remove('ts-active', 'ts-done', 'ts-wrong');
+    const tid = btn.dataset.topicId;
+    const stats = state.topicStats[tid];
+    const remaining = state.queue.slice(state.idx).some(q => q.topic === tid);
+    const topicInfo = TOPICS.find(t => t.id === tid);
+    const scoreTag = stats && (stats.correct + stats.wrong) > 0
+      ? `<span class="ts-score">${stats.correct}/${stats.correct + stats.wrong}</span>` : '';
+    btn.innerHTML = `${topicInfo?.icon || ''} ${topicInfo?.label || tid}${scoreTag}`;
+    if (tid === currentTopic) {
+      btn.classList.add('ts-active');
+    } else if (!remaining && stats) {
+      const pct = stats.correct / Math.max(1, stats.correct + stats.wrong);
+      btn.classList.add(pct >= 0.6 ? 'ts-done' : 'ts-wrong');
+    }
+  });
+}
+
+function jumpToTopic(topicId) {
+  state.awaitingSimilar = false;
+  state.currentSimilar = null;
+  // Look for unanswered questions of this topic ahead of current position
+  const nextIdx = state.queue.findIndex((q, i) => i >= state.idx && q.topic === topicId);
+  if (nextIdx !== -1) {
+    state.idx = nextIdx;
+  } else {
+    // Topic already finished — append fresh questions for it and jump there
+    const fresh = buildFreshTopicQueue(topicId);
+    if (fresh.length) {
+      state.queue.push(...fresh);
+      state.idx = state.queue.length - fresh.length;
+      // Reset stats for the revisit
+      if (!state.topicStats[topicId]) state.topicStats[topicId] = { correct: 0, wrong: 0 };
+    }
+  }
   renderQuestion();
 }
 
@@ -917,6 +1316,7 @@ function renderQuestion() {
   if (state.idx >= state.queue.length) { showResults(); return; }
   updateHeader();
   updateProgress();
+  updateTopicSwitcher();
   const q = state.awaitingSimilar ? state.currentSimilar : state.queue[state.idx];
   const area = document.getElementById('question-area');
   area.innerHTML = '';
@@ -932,6 +1332,7 @@ function renderQuestion() {
     <div class="q-meta">
       <span class="badge ${typeBadges[q.type] || 'badge-mc'}">${typeLabels[q.type] || q.type}</span>
       ${topicInfo ? `<span class="topic-tag">${topicInfo.icon} ${topicInfo.label}</span>` : ''}
+      <button class="skip-btn" id="skip-btn" style="margin-left:auto" onclick="skipQuestion()">Skip →</button>
     </div>
     <div class="q-text">${q.question}</div>
     ${q.formula ? `<div class="formula-hint"><strong>Formula hint</strong>${q.formula}</div>` : ''}
@@ -943,6 +1344,12 @@ function renderQuestion() {
     const lbl = document.createElement('div');
     lbl.className = 'similar-label';
     lbl.textContent = '⟳ Similar question — try again!';
+    card.insertBefore(lbl, card.querySelector('.q-meta'));
+  }
+  if (!state.awaitingSimilar && state.queue[state.idx]?._review) {
+    const lbl = document.createElement('div');
+    lbl.className = 'review-label';
+    lbl.textContent = '↩ Review — you got this wrong before';
     card.insertBefore(lbl, card.querySelector('.q-meta'));
   }
 
@@ -1039,9 +1446,35 @@ function renderSA(q, container) {
   container.appendChild(wrap);
 }
 
+function skipQuestion() {
+  state.awaitingSimilar = false;
+  state.currentSimilar = null;
+  state.idx++;
+  renderQuestion();
+}
+
 // ── FEEDBACK ──────────────────────────────────────────────────────────────────
 function showFeedback(q, correct, hits) {
+  const skipBtn = document.getElementById('skip-btn');
+  if (skipBtn) skipBtn.style.display = 'none';
   if (correct) state.correct++; else state.wrong++;
+
+  // Track per-topic stats and wrong answers
+  if (!state.awaitingSimilar) {
+    const qObj = state.queue[state.idx];
+    const topic = qObj?.topic;
+    if (topic && state.topicStats[topic]) {
+      if (correct) state.topicStats[topic].correct++;
+      else {
+        state.topicStats[topic].wrong++;
+        // Record for review (deduplicate by id)
+        if (qObj && !state.wrongAnswers.find(w => w.id === qObj.id)) {
+          state.wrongAnswers.push(qObj);
+        }
+      }
+    }
+    if (qObj?.id && topic && !qObj._review) markUsed(topic, qObj.id);
+  }
   updateHeader();
 
   const area = document.getElementById('feedback-area');
@@ -1073,13 +1506,23 @@ function showFeedback(q, correct, hits) {
   // Next / retry button
   const nextBtn = document.createElement('button');
   nextBtn.className = 'next-btn';
-  const hasNext = state.idx + 1 < state.queue.length;
+
+  const isLastQ = state.idx + 1 >= state.queue.length;
+  const currentTopic = state.queue[state.idx]?.topic;
+  const nextTopic = state.queue[state.idx + 1]?.topic;
+  const topicEnds = !state.awaitingSimilar && currentTopic && (isLastQ || nextTopic !== currentTopic);
 
   if (!correct && SIMILAR[state.queue[state.idx]?.id] && !state.awaitingSimilar) {
     nextBtn.textContent = 'Try a Similar Question →';
     nextBtn.onclick = () => loadSimilar();
+  } else if (topicEnds && isLastQ) {
+    nextBtn.textContent = 'Finish & See Topic Grade';
+    nextBtn.onclick = () => advance();
+  } else if (topicEnds) {
+    nextBtn.textContent = 'See Topic Grade →';
+    nextBtn.onclick = () => advance();
   } else {
-    nextBtn.textContent = state.idx + 1 >= state.queue.length ? 'See Results' : 'Next Question →';
+    nextBtn.textContent = 'Next Question →';
     nextBtn.onclick = () => advance();
   }
 
@@ -1103,10 +1546,105 @@ function loadSimilar() {
 }
 
 function advance() {
+  const prevQ = state.queue[state.idx];
+  const prevTopic = prevQ?.topic;
+  const wasSimilar = state.awaitingSimilar;
+  const wasReview = prevQ?._review;
   state.awaitingSimilar = false;
   state.currentSimilar = null;
   state.idx++;
+  const nextTopic = state.queue[state.idx]?.topic;
+  // Show topic grade only for real (non-review, non-similar) questions at topic boundary
+  const topicJustFinished = !wasSimilar && !wasReview && prevTopic &&
+    (state.idx >= state.queue.length || nextTopic !== prevTopic);
+  if (topicJustFinished) {
+    showTopicGrade(prevTopic, () => {
+      if (state.idx >= state.queue.length) showResults();
+      else renderQuestion();
+    });
+  } else if (state.idx >= state.queue.length) {
+    showResults();
+  } else {
+    renderQuestion();
+  }
+}
+
+function reviewWrongAnswers(questions, onFinish) {
+  if (!questions.length) { onFinish(); return; }
+  // Inject review copies right at current position so normal flow handles them
+  const copies = fisherYates(questions).map(q => ({ ...q, _review: true, id: q.id + '_rev' }));
+  state.queue.splice(state.idx, 0, ...copies);
   renderQuestion();
+}
+
+function reviewAllWrong() {
+  // Called from results screen — restart quiz screen with all wrong answers
+  document.getElementById('results-screen').style.display = 'none';
+  document.getElementById('quiz-screen').style.display = 'block';
+  document.getElementById('score-bar').style.display = '';
+  const copies = fisherYates(state.wrongAnswers).map(q => ({ ...q, _review: true, id: q.id + '_rev' }));
+  state.queue = copies;
+  state.idx = 0;
+  state.awaitingSimilar = false;
+  state.currentSimilar = null;
+  updateTopicSwitcher();
+  renderQuestion();
+}
+
+function showTopicGrade(topicId, onContinue) {
+  updateTopicSwitcher();
+  const area = document.getElementById('question-area');
+  area.innerHTML = '';
+  const stats = state.topicStats[topicId] || { correct: 0, wrong: 0 };
+  const total = stats.correct + stats.wrong;
+  const pct = total ? Math.round((stats.correct / total) * 100) : 0;
+  const topicInfo = TOPICS.find(t => t.id === topicId);
+  const isLast = state.idx >= state.queue.length;
+
+  let grade, gradeClass, gradeMsg;
+  if (pct >= 90) { grade = 'A'; gradeClass = 'grade-a'; gradeMsg = 'Excellent! You\'ve mastered this topic.'; }
+  else if (pct >= 75) { grade = 'B'; gradeClass = 'grade-b'; gradeMsg = 'Good work! A few more reviews and you\'ll nail it.'; }
+  else if (pct >= 50) { grade = 'C'; gradeClass = 'grade-c'; gradeMsg = 'Decent effort. Review the walkthroughs for the questions you missed.'; }
+  else { grade = 'D'; gradeClass = 'grade-d'; gradeMsg = 'Keep practising — re-read the material and try again.'; }
+
+  const card = document.createElement('div');
+  card.className = 'card topic-grade-card';
+  card.innerHTML = `
+    <div class="tg-icon">${topicInfo?.icon || '📊'}</div>
+    <h2>${topicInfo?.label || topicId} — Topic Complete</h2>
+    <div class="tg-sub">Here's how you did on this topic</div>
+    <div class="grade-ring ${gradeClass}">${grade}<span style="font-size:.9rem">  ${pct}%</span></div>
+    <div class="tg-stats">
+      <div class="tg-stat tg-c"><div class="tg-num">${stats.correct}</div><div class="tg-lbl">Correct</div></div>
+      <div class="tg-stat tg-w"><div class="tg-num">${stats.wrong}</div><div class="tg-lbl">Wrong</div></div>
+      <div class="tg-stat"><div class="tg-num">${total}</div><div class="tg-lbl">Answered</div></div>
+    </div>
+    <p class="tg-msg">${gradeMsg}</p>
+  `;
+
+  const btnRow = document.createElement('div');
+  btnRow.style.cssText = 'display:flex;gap:.6rem;flex-wrap:wrap;justify-content:center;margin-top:.5rem;';
+
+  const topicWrong = state.wrongAnswers.filter(q => q.topic === topicId);
+  if (topicWrong.length) {
+    const reviewBtn = document.createElement('button');
+    reviewBtn.className = 'review-btn';
+    reviewBtn.textContent = `↩ Retry ${topicWrong.length} Wrong Answer${topicWrong.length > 1 ? 's' : ''}`;
+    reviewBtn.onclick = () => {
+      card.remove();
+      reviewWrongAnswers(topicWrong, onContinue);
+    };
+    btnRow.appendChild(reviewBtn);
+  }
+
+  const btn = document.createElement('button');
+  btn.className = 'next-btn';
+  btn.style.cssText = 'display:inline-block;margin-top:0';
+  btn.textContent = isLast ? 'See Overall Results' : 'Next Topic →';
+  btn.onclick = onContinue;
+  btnRow.appendChild(btn);
+  card.appendChild(btnRow);
+  area.appendChild(card);
 }
 
 // ── PROGRESS / HEADER ─────────────────────────────────────────────────────────
@@ -1140,10 +1678,403 @@ function showResults() {
     [0,  'Keep studying! Work through the walkthroughs carefully.'],
   ];
   document.getElementById('res-message').textContent = msgs.find(([t]) => pct >= t)[1];
+
+  // Show retry button if there are wrong answers
+  const retryBtn = document.getElementById('res-review-btn');
+  if (retryBtn) retryBtn.style.display = state.wrongAnswers.length ? 'inline-block' : 'none';
+
+  // Per-topic breakdown
+  const breakdown = document.getElementById('res-topic-breakdown');
+  breakdown.innerHTML = '';
+  state.selectedTopics.forEach(tid => {
+    const s = state.topicStats[tid] || { correct: 0, wrong: 0 };
+    const t = s.correct + s.wrong;
+    const p = t ? Math.round(s.correct / t * 100) : 0;
+    const info = TOPICS.find(x => x.id === tid);
+    const clr = p >= 75 ? 'var(--success)' : p >= 50 ? 'var(--warn)' : 'var(--danger)';
+    breakdown.innerHTML += `
+      <div style="display:flex;align-items:center;gap:.8rem;padding:.6rem 0;border-bottom:1px solid var(--border);">
+        <span style="font-size:1.4rem">${info?.icon||''}</span>
+        <span style="flex:1;font-size:.95rem">${info?.label||tid}</span>
+        <span style="font-weight:700;color:${clr}">${p}%</span>
+        <span style="font-size:.82rem;color:var(--muted)">${s.correct}/${t}</span>
+      </div>`;
+  });
+}
+
+// ── ADD SUBJECT MODAL ─────────────────────────────────────────────────────────
+let _pendingQuestions = [];  // questions being built in the modal
+let _editingQIdx = null;
+
+function openAddSubjectModal() {
+  _pendingQuestions = [];
+  _editingQIdx = null;
+  document.getElementById('subj-name').value = '';
+  document.getElementById('subj-icon').value = '';
+  document.getElementById('subj-desc').value = '';
+  renderModalQList();
+  document.getElementById('modal-q-form').style.display = 'none';
+  document.getElementById('add-subject-modal').classList.add('open');
+}
+function closeAddSubjectModal() {
+  document.getElementById('add-subject-modal').classList.remove('open');
+}
+
+function renderModalQList() {
+  const ul = document.getElementById('modal-q-list');
+  ul.innerHTML = '';
+  if (!_pendingQuestions.length) {
+    ul.innerHTML = '<li style="color:var(--muted);font-size:.85rem;padding:.4rem 0">No questions yet — add one below.</li>';
+    return;
+  }
+  _pendingQuestions.forEach((q, i) => {
+    const li = document.createElement('li');
+    li.innerHTML = `<span class="q-num">${i+1}</span>
+      <span style="flex:1">[${q.type.toUpperCase()}] ${q.question.substring(0,60)}${q.question.length>60?'…':''}</span>
+      <button class="del-q" title="Edit" onclick="editQuestion(${i})">✏️</button>
+      <button class="del-q" title="Delete" onclick="deleteQuestion(${i})">🗑</button>`;
+    ul.appendChild(li);
+  });
+}
+
+function showAddQuestionForm(idx) {
+  _editingQIdx = idx !== undefined ? idx : null;
+  const existing = idx !== undefined ? _pendingQuestions[idx] : null;
+  const form = document.getElementById('modal-q-form');
+  const type = existing?.type || 'mc';
+  form.innerHTML = `
+    <div class="q-form-box">
+      <h4>${existing ? 'Edit' : 'New'} Question</h4>
+      <div class="form-row">
+        <label>Type</label>
+        <select id="qf-type" onchange="refreshQFormType()">
+          <option value="mc" ${type==='mc'?'selected':''}>Multiple Choice</option>
+          <option value="tf" ${type==='tf'?'selected':''}>True / False</option>
+          <option value="calc" ${type==='calc'?'selected':''}>Calculation</option>
+          <option value="sa" ${type==='sa'?'selected':''}>Short Answer</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>Question Text</label>
+        <textarea id="qf-question" placeholder="Enter the question…">${existing?.question||''}</textarea>
+      </div>
+      <div id="qf-type-fields"></div>
+      <div class="form-row">
+        <label>Explanation (shown after answering)</label>
+        <textarea id="qf-explanation" placeholder="Brief explanation of the correct answer…">${existing?.explanation||''}</textarea>
+      </div>
+      <div style="display:flex;gap:.5rem;margin-top:.5rem">
+        <button class="save-q-btn" onclick="saveQuestion()">Save Question</button>
+        <button class="cancel-q-btn" onclick="cancelQuestionForm()">Cancel</button>
+      </div>
+    </div>`;
+  form.style.display = 'block';
+  document.getElementById('add-q-btn').style.display = 'none';
+  renderQTypeFields(type, existing);
+}
+
+function refreshQFormType() {
+  const type = document.getElementById('qf-type').value;
+  renderQTypeFields(type, null);
+}
+
+function renderQTypeFields(type, existing) {
+  const container = document.getElementById('qf-type-fields');
+  if (type === 'mc') {
+    const opts = existing?.options || ['','','',''];
+    const ans  = existing?.answer !== undefined ? existing.answer : 0;
+    container.innerHTML = `
+      <div class="form-row"><label>Options (mark correct with ★)</label>
+        ${opts.map((o,i)=>`
+          <div style="display:flex;gap:.4rem;align-items:center;margin-bottom:.4rem">
+            <input type="radio" name="mc-correct" value="${i}" ${ans===i?'checked':''} title="Correct answer">
+            <input type="text" id="mc-opt-${i}" value="${o}" placeholder="Option ${String.fromCharCode(65+i)}" style="flex:1">
+          </div>`).join('')}
+      </div>`;
+  } else if (type === 'tf') {
+    const ans = existing?.answer !== undefined ? existing.answer : true;
+    container.innerHTML = `
+      <div class="form-row"><label>Correct Answer</label>
+        <select id="tf-answer">
+          <option value="true" ${ans===true?'selected':''}>True</option>
+          <option value="false" ${ans===false?'selected':''}>False</option>
+        </select>
+      </div>`;
+  } else if (type === 'calc') {
+    container.innerHTML = `
+      <div class="form-row row2">
+        <div><label>Correct Answer</label>
+          <input type="text" id="calc-answer" value="${existing?.answer||''}" placeholder="e.g. 4.5">
+        </div>
+        <div><label>Unit</label>
+          <input type="text" id="calc-unit" value="${existing?.unit||''}" placeholder="e.g. N">
+        </div>
+      </div>
+      <div class="form-row"><label>Formula Hint (optional)</label>
+        <input type="text" id="calc-formula" value="${existing?.formula||''}" placeholder="e.g. F = ma">
+      </div>`;
+  } else if (type === 'sa') {
+    container.innerHTML = `
+      <div class="form-row"><label>Model Answer</label>
+        <textarea id="sa-answer" placeholder="Full model answer…">${existing?.answer||''}</textarea>
+      </div>
+      <div class="form-row"><label>Key Concepts (comma-separated, for auto-marking)</label>
+        <input type="text" id="sa-keywords" value="${(existing?.keywords||[]).join(', ')}" placeholder="e.g. resistance, current, voltage">
+      </div>`;
+  }
+}
+
+function editQuestion(idx) { showAddQuestionForm(idx); }
+function deleteQuestion(idx) {
+  _pendingQuestions.splice(idx, 1);
+  renderModalQList();
+}
+function cancelQuestionForm() {
+  document.getElementById('modal-q-form').style.display = 'none';
+  document.getElementById('add-q-btn').style.display = 'block';
+  _editingQIdx = null;
+}
+
+function saveQuestion() {
+  const type = document.getElementById('qf-type').value;
+  const question = document.getElementById('qf-question').value.trim();
+  const explanation = document.getElementById('qf-explanation').value.trim();
+  if (!question) { alert('Please enter a question.'); return; }
+
+  const topicId = (document.getElementById('subj-name').value.trim().toLowerCase().replace(/\s+/g,'_')) || 'custom';
+  const id = `custom_${topicId}_${Date.now()}`;
+  let q = { id, topic: topicId, type, question, explanation };
+
+  if (type === 'mc') {
+    const opts = [0,1,2,3].map(i => document.getElementById(`mc-opt-${i}`)?.value.trim()).filter(Boolean);
+    const correctRaw = document.querySelector('input[name="mc-correct"]:checked')?.value;
+    if (opts.length < 2) { alert('Add at least 2 options.'); return; }
+    q.options = opts;
+    q.answer = correctRaw !== undefined ? parseInt(correctRaw) : 0;
+  } else if (type === 'tf') {
+    q.answer = document.getElementById('tf-answer').value === 'true';
+  } else if (type === 'calc') {
+    const ans = document.getElementById('calc-answer').value.trim();
+    if (!ans) { alert('Enter the correct answer.'); return; }
+    q.answer = ans;
+    q.unit = document.getElementById('calc-unit').value.trim() || '';
+    q.tolerance = 0.01;
+    q.formula = document.getElementById('calc-formula').value.trim() || null;
+  } else if (type === 'sa') {
+    q.answer = document.getElementById('sa-answer').value.trim();
+    q.keywords = document.getElementById('sa-keywords').value.split(',').map(k=>k.trim()).filter(Boolean);
+    if (!q.keywords.length) q.keywords = [q.answer.substring(0,20)];
+  }
+
+  if (_editingQIdx !== null) {
+    _pendingQuestions[_editingQIdx] = q;
+  } else {
+    _pendingQuestions.push(q);
+  }
+  cancelQuestionForm();
+  renderModalQList();
+}
+
+function saveCustomSubject() {
+  const name = document.getElementById('subj-name').value.trim();
+  const icon = document.getElementById('subj-icon').value.trim() || '📚';
+  const desc = document.getElementById('subj-desc').value.trim() || name;
+  if (!name) { alert('Please enter a subject name.'); return; }
+  if (!_pendingQuestions.length) { alert('Add at least one question.'); return; }
+
+  const topicId = name.toLowerCase().replace(/\s+/g,'_');
+  const topic = { id: topicId, label: name, icon, desc, _custom: true };
+
+  // Assign correct topicId to all questions
+  _pendingQuestions.forEach(q => { q.topic = topicId; });
+
+  if (!TOPICS.find(t => t.id === topicId)) TOPICS.push(topic);
+  _pendingQuestions.forEach(q => {
+    if (!QBANK.find(x => x.id === q.id)) QBANK.push(q);
+  });
+
+  saveCustomTopics();
+  closeAddSubjectModal();
+  buildTopicGrid(); // refresh grid to show new topic
+}
+
+// ── PROFILE MANAGEMENT ────────────────────────────────────────────────────────
+const PROFILE_AVATARS = ['🧒','👦','👧','🧑','🎓','🦊','🐱','🦁','🦋','⭐'];
+const PROFILE_COLORS  = ['#1a73e8','#e84335','#34a853','#9c27b0','#ff6d00','#00897b'];
+
+let _profiles = [];
+let _editingProfileId = null;
+let _selectedAvatar = PROFILE_AVATARS[0];
+let _selectedColor  = PROFILE_COLORS[0];
+
+function loadProfiles() {
+  try { _profiles = JSON.parse(localStorage.getItem('physPrepProfiles') || '[]'); }
+  catch(e) { _profiles = []; }
+}
+
+function saveProfiles() {
+  localStorage.setItem('physPrepProfiles', JSON.stringify(_profiles));
+}
+
+function renderProfileGrid() {
+  const grid = document.getElementById('profile-grid');
+  grid.innerHTML = '';
+  _profiles.forEach(p => {
+    const card = document.createElement('div');
+    card.className = 'profile-card';
+    card.style.borderColor = p.color;
+    card.innerHTML = `
+      <div class="profile-card-actions">
+        <button title="Edit" onclick="event.stopPropagation();openProfileModal('${p.id}')">✏️</button>
+        <button title="Delete" onclick="event.stopPropagation();deleteProfile('${p.id}')">🗑</button>
+      </div>
+      <div class="profile-avatar">${p.avatar}</div>
+      <div class="profile-name">${p.name}</div>
+      <div class="profile-age">Age ${p.age}</div>
+      <div class="profile-color-bar" style="background:${p.color}"></div>`;
+    card.onclick = () => selectProfile(p.id);
+    grid.appendChild(card);
+  });
+  // Add-profile card
+  const addCard = document.createElement('div');
+  addCard.className = 'profile-card add-profile-card';
+  addCard.innerHTML = `<div class="profile-avatar">➕</div><div class="profile-name">Add Profile</div>`;
+  addCard.onclick = () => openProfileModal(null);
+  grid.appendChild(addCard);
+}
+
+function openProfileModal(profileId) {
+  _editingProfileId = profileId || null;
+  const existing = profileId ? _profiles.find(p => p.id === profileId) : null;
+  document.getElementById('profile-modal-title').textContent = existing ? 'Edit Profile' : 'Add Profile';
+  document.getElementById('prof-name').value = existing ? existing.name : '';
+  document.getElementById('prof-age').value  = existing ? existing.age  : '';
+  _selectedAvatar = existing ? existing.avatar : PROFILE_AVATARS[0];
+  _selectedColor  = existing ? existing.color  : PROFILE_COLORS[0];
+
+  // Build avatar picker
+  const ap = document.getElementById('avatar-picker');
+  ap.innerHTML = '';
+  PROFILE_AVATARS.forEach(em => {
+    const span = document.createElement('span');
+    span.className = 'avatar-opt' + (em === _selectedAvatar ? ' selected' : '');
+    span.textContent = em;
+    span.onclick = () => {
+      _selectedAvatar = em;
+      ap.querySelectorAll('.avatar-opt').forEach(s => s.classList.remove('selected'));
+      span.classList.add('selected');
+    };
+    ap.appendChild(span);
+  });
+
+  // Build color picker
+  const cp = document.getElementById('color-picker');
+  cp.innerHTML = '';
+  PROFILE_COLORS.forEach(col => {
+    const swatch = document.createElement('div');
+    swatch.className = 'color-swatch' + (col === _selectedColor ? ' selected' : '');
+    swatch.style.background = col;
+    swatch.onclick = () => {
+      _selectedColor = col;
+      cp.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+      swatch.classList.add('selected');
+    };
+    cp.appendChild(swatch);
+  });
+
+  document.getElementById('profile-modal').classList.add('open');
+}
+
+function closeProfileModal() {
+  document.getElementById('profile-modal').classList.remove('open');
+}
+
+function saveProfile() {
+  const name = document.getElementById('prof-name').value.trim();
+  const age  = parseInt(document.getElementById('prof-age').value, 10);
+  if (!name) { alert('Please enter a name.'); return; }
+  if (!age || age < 1) { alert('Please enter a valid age.'); return; }
+
+  if (_editingProfileId) {
+    const p = _profiles.find(p => p.id === _editingProfileId);
+    if (p) { p.name = name; p.age = age; p.avatar = _selectedAvatar; p.color = _selectedColor; }
+  } else {
+    const id = 'p_' + Date.now();
+    _profiles.push({ id, name, age, avatar: _selectedAvatar, color: _selectedColor, createdAt: new Date().toISOString() });
+  }
+  saveProfiles();
+  closeProfileModal();
+  renderProfileGrid();
+}
+
+function deleteProfile(id) {
+  if (!confirm('Delete this profile? All progress will be lost.')) return;
+  // Remove all localStorage keys for this profile
+  const keysToRemove = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && (k.startsWith('physPrepUsed_' + id + '_') || k === 'physPrepCustom_' + id)) {
+      keysToRemove.push(k);
+    }
+  }
+  keysToRemove.forEach(k => localStorage.removeItem(k));
+  _profiles = _profiles.filter(p => p.id !== id);
+  saveProfiles();
+  renderProfileGrid();
+}
+
+function selectProfile(id) {
+  const profile = _profiles.find(p => p.id === id);
+  if (!profile) return;
+  state.profileId = id;
+
+  // Show profile tag in header
+  document.getElementById('active-profile-tag').style.display = 'flex';
+  document.getElementById('active-profile-tag').textContent = profile.avatar + ' ' + profile.name;
+  document.getElementById('switch-profile-btn').style.display = '';
+
+  loadCustomTopics();
+  showTopicScreen();
+}
+
+function showProfileScreen() {
+  state.profileId = null;
+  document.getElementById('active-profile-tag').style.display = 'none';
+  document.getElementById('switch-profile-btn').style.display = 'none';
+  document.getElementById('score-bar').style.display = 'none';
+  document.getElementById('profile-screen').style.display = '';
+  document.getElementById('topic-screen').style.display   = 'none';
+  document.getElementById('quiz-screen').style.display    = 'none';
+  document.getElementById('results-screen').style.display = 'none';
+  renderProfileGrid();
+}
+
+function showTopicScreen() {
+  const profile = _profiles.find(p => p.id === state.profileId);
+  const h2 = document.getElementById('topic-screen-h2');
+  h2.textContent = profile ? `Hi ${profile.name}! Choose topics to practise` : 'Choose topics to practise';
+
+  // Reset quiz state
+  state.queue = []; state.idx = 0; state.correct = 0; state.wrong = 0;
+  state.awaitingSimilar = false; state.currentSimilar = null;
+  state.selectedTopics = []; state.topicStats = {}; state.wrongAnswers = [];
+
+  // Rebuild topic grid fresh
+  const grid = document.getElementById('topic-grid');
+  grid.innerHTML = '';
+  buildTopicGrid();
+
+  document.getElementById('score-bar').style.display = 'none';
+  document.getElementById('profile-screen').style.display   = 'none';
+  document.getElementById('topic-screen').style.display     = '';
+  document.getElementById('quiz-screen').style.display      = 'none';
+  document.getElementById('results-screen').style.display   = 'none';
+  document.getElementById('start-btn').disabled = true;
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-buildTopicGrid();
+loadProfiles();
+showProfileScreen();
 </script>
 </body>
 </html>
