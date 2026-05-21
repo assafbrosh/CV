@@ -3861,6 +3861,7 @@ function adminToggleTopic(topicId, btn) {
 function renderAdminBenchmarks(topicId) {
   const container = document.getElementById(`admin-bm-${topicId}`);
   const list = getBenchmarks(topicId);
+  const existingQs = QBANK.filter(q => q.topic === topicId);
   const typeIcon = mime => mime?.startsWith('image') ? '🖼️' : mime === 'application/pdf' ? '📄' : '📎';
   let html = `<div class="admin-bench-title">Benchmark Materials</div>
     <div class="admin-bench-list">`;
@@ -3876,16 +3877,32 @@ function renderAdminBenchmarks(topicId) {
     </div>`;
   });
   html += `</div>
-    <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.35rem">
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-top:.35rem">
       <label class="admin-bench-upload-btn">
         📎 Upload Benchmark (PDF, JPG, PNG)
         <input type="file" style="display:none" accept=".pdf,.jpg,.jpeg,.png,.webp" onchange="adminUploadBenchmark('${topicId}',this)">
       </label>
       <button class="admin-gen-btn" id="gen-btn-${topicId}" onclick="generateQuestionsFromBenchmarks('${topicId}')">
-        🤖 Generate Questions with AI
+        🤖 From Benchmarks
       </button>
-    </div>
-    <div id="bench-preview-${topicId}"></div>`;
+    </div>`;
+
+  if (existingQs.length >= 1) {
+    html += `
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-top:.5rem;padding-top:.5rem;border-top:1px dashed var(--border)">
+      <span style="font-size:.82rem;color:var(--muted);flex-shrink:0">Generate more like existing:</span>
+      <select id="gen-diff-${topicId}" style="font-size:.82rem;padding:.25rem .5rem;border:1.5px solid var(--border);border-radius:6px;background:#fff">
+        <option value="easy">🟢 Easy</option>
+        <option value="medium" selected>🟡 Medium</option>
+        <option value="hard">🔴 Hard</option>
+      </select>
+      <button class="admin-gen-btn" id="gen-ex-btn-${topicId}" onclick="generateQuestionsFromExamples('${topicId}')">
+        ✨ Generate from Examples
+      </button>
+    </div>`;
+  }
+
+  html += `<div id="bench-preview-${topicId}"></div>`;
   container.innerHTML = html;
 }
 
@@ -4164,7 +4181,120 @@ The "answer" field is the 0-based index of the correct option.`;
   } catch(e) {
     alert(`Generation failed: ${e.message}`);
   } finally {
-    setBtnText('🤖 Generate Questions with AI');
+    setBtnText('🤖 From Benchmarks');
+  }
+}
+
+// ── GENERATE FROM EXISTING QUESTIONS ──────────────────────────────────────────
+async function generateQuestionsFromExamples(topicId) {
+  const existingQs = QBANK.filter(q => q.topic === topicId);
+  if (!existingQs.length) { alert('No existing questions found for this topic.'); return; }
+
+  const provider   = getAIProvider();
+  const storageKey = provider === 'openai' ? 'physPrepAIKey' : 'physPrepAIKeyAnthropic';
+  const apiKey     = (localStorage.getItem(storageKey) || '').trim();
+  if (!apiKey) {
+    const name = provider === 'openai' ? 'OpenAI' : 'Anthropic';
+    alert(`Please set your ${name} API key in the AI Settings section of the Admin Panel.`);
+    return;
+  }
+
+  const topic = TOPICS.find(t => t.id === topicId);
+  const btn   = document.getElementById(`gen-ex-btn-${topicId}`);
+  const diffSel = document.getElementById(`gen-diff-${topicId}`);
+  const difficulty = diffSel?.value || 'medium';
+  const diffInstruction = {
+    easy:   'simple recall and basic understanding (Year 7–8 level)',
+    medium: 'moderate reasoning and multi-step application (Year 9 level)',
+    hard:   'challenging analysis, complex calculations and critical thinking (Year 10–11 level)'
+  }[difficulty] || 'moderate difficulty';
+
+  const setBtn = t => { if (btn) { btn.textContent = t; btn.disabled = !!t.match(/^⏳/); } };
+  setBtn('⏳ Generating…');
+
+  // Build few-shot examples from existing questions (up to 5 to keep prompt concise)
+  const samples = existingQs.slice(0, 5).map(q => ({
+    question: q.question,
+    options:  q.options || [],
+    answer:   q.answer,
+    explanation: q.explanation || '',
+  }));
+
+  const promptText = `You are a teacher creating quiz questions for Year 9 students about "${topic?.label || topicId}"${topic?.theory ? `. The topic covers: ${topic.theory.replace(/<[^>]+>/g,' ').trim()}` : ''}.
+
+Here are ${samples.length} example question(s) already in this topic (use them to understand the style, scope and subject matter — do NOT repeat them):
+
+${JSON.stringify(samples, null, 2)}
+
+Generate 8 NEW multiple-choice questions at ${diffInstruction}. The new questions must:
+- Cover the same subject matter but be clearly different from the examples above
+- Match the difficulty level specified (${difficulty})
+- Be varied (different question styles, different concepts within the topic)
+
+Return ONLY a valid JSON array — no markdown, no explanation, just the array:
+
+[
+  {
+    "question": "Question text",
+    "options": ["Option A","Option B","Option C","Option D"],
+    "answer": 0,
+    "explanation": "Why the correct answer is right",
+    "walkthrough": ["Step 1","Step 2","Step 3"]
+  }
+]
+
+The "answer" field is the 0-based index of the correct option.`;
+
+  try {
+    let responseText;
+
+    if (provider === 'anthropic') {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: 'claude-opus-4-5',
+          max_tokens: 3000,
+          messages: [{ role: 'user', content: promptText }],
+        }),
+      });
+      if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e?.error?.message || `HTTP ${res.status}`); }
+      const json = await res.json();
+      responseText = json.content?.[0]?.text || '';
+    } else {
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          temperature: 0.8,
+          max_tokens: 3000,
+          messages: [
+            { role: 'system', content: 'You generate educational multiple-choice questions. Return only valid JSON arrays — no markdown fences, no explanation.' },
+            { role: 'user', content: promptText },
+          ],
+        }),
+      });
+      if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e?.error?.message || `HTTP ${res.status}`); }
+      const json = await res.json();
+      responseText = json.choices?.[0]?.message?.content || '';
+    }
+
+    const match = responseText.match(/\[[\s\S]*\]/);
+    if (!match) throw new Error('No JSON array found in response. Try again.');
+    const generated = JSON.parse(match[0]);
+    if (!Array.isArray(generated) || !generated.length) throw new Error('Empty question list returned.');
+    showGenReviewModal(topicId, generated);
+
+  } catch(e) {
+    alert(`Generation failed: ${e.message}`);
+  } finally {
+    setBtn('✨ Generate from Examples');
   }
 }
 
