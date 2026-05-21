@@ -2227,10 +2227,10 @@ function goBackToSubjects() {
 // Central helper — hides every screen then shows the one named
 function _setScreenVisibility(show) {
   ['profile-screen','category-screen','topic-screen','quiz-screen','results-screen'].forEach(id => {
-    document.getElementById(id).style.display = id === show ? '' : 'none';
+    document.getElementById(id).style.display = id === show ? 'block' : 'none';
   });
   const inQuiz = show === 'quiz-screen';
-  document.getElementById('score-bar').style.display  = inQuiz ? '' : 'none';
+  document.getElementById('score-bar').style.display  = inQuiz ? 'flex' : 'none';
   document.getElementById('home-btn').style.display   = inQuiz ? '' : 'none';
 }
 
@@ -2419,16 +2419,22 @@ function renderQuestion() {
   area.appendChild(card);
 
   const inputArea = document.getElementById('input-area');
-  if (q.type === 'mc') renderMC(q, inputArea);
-  else if (q.type === 'tf') renderTF(q, inputArea);
-  else if (q.type === 'calc') renderCalc(q, inputArea);
-  else if (q.type === 'sa') renderSA(q, inputArea);
+  try {
+    if (q.type === 'mc' || (!q.type && q.options)) renderMC(q, inputArea);
+    else if (q.type === 'tf') renderTF(q, inputArea);
+    else if (q.type === 'calc') renderCalc(q, inputArea);
+    else if (q.type === 'sa') renderSA(q, inputArea);
+    else if (q.type) inputArea.innerHTML = `<p style="color:var(--muted);padding:.5rem">Question type "${q.type}" not supported.</p>`;
+  } catch(err) {
+    inputArea.innerHTML = `<p style="color:var(--danger);padding:.5rem">⚠ Could not render question: ${err.message}</p>`;
+    console.error('renderQuestion error:', err, q);
+  }
 }
 
 function renderMC(q, container) {
   const letters = ['A','B','C','D'];
   const div = document.createElement('div'); div.className = 'options';
-  q.options.forEach((opt, i) => {
+  (q.options || []).forEach((opt, i) => {
     const btn = document.createElement('button');
     btn.className = 'option-btn';
     btn.innerHTML = `<span class="opt-letter">${letters[i]}</span><span>${opt}</span>`;
@@ -4249,35 +4255,46 @@ function loadExtraQuestions() {
 }
 
 // ── DATA REPAIR ───────────────────────────────────────────────────────────────
-// Fixes corrupted data from old bug where admin-added questions got saved with
-// a label-derived topic ID (e.g. "power_1748000000") instead of the real topic ID.
+// Fixes corrupted data from old bug: admin-added questions were saved to a ghost
+// topic with a label-derived ID (e.g. "power_1748000000") instead of the real
+// topic modal ID (e.g. "topic_1748000000"). The ghost IS in TOPICS so it looks
+// valid — we detect it by ID pattern and merge it into the real topic.
 function repairDataCorruption() {
-  const topicIds = new Set(TOPICS.map(t => t.id));
-  const orphaned = QBANK.filter(q => !topicIds.has(q.topic));
-  if (!orphaned.length) return;
-
   let changed = false;
-  orphaned.forEach(q => {
-    // Old saveCustomSubject() created IDs like: "power_1748000000000" (label + _ + timestamp)
-    const ghostBase = q.topic.replace(/_\d{10,}$/, '').toLowerCase();
-    const target = TOPICS.find(t => {
-      const labelNorm = t.label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
-      return labelNorm === ghostBase;
-    });
-    if (target) {
-      q.topic = target.id;
-      if (!target._custom) target._custom = true; // mark custom so it saves
-      changed = true;
-    }
+
+  // Ghost topics: custom, ID does NOT start with "topic_", ends with _TIMESTAMP
+  const ghosts = TOPICS.filter(t =>
+    t._custom && !t.id.startsWith('topic_') && /^.+_\d{10,}$/.test(t.id)
+  );
+
+  ghosts.forEach(ghost => {
+    // Find matching real topic: same label + same subjectId + id starts with "topic_"
+    const real = TOPICS.find(t =>
+      t.id !== ghost.id &&
+      t.id.startsWith('topic_') &&
+      t.label === ghost.label &&
+      t.subjectId === ghost.subjectId
+    );
+    if (!real) return; // ghost IS the only topic — keep it
+
+    // Move questions from ghost to real
+    QBANK.forEach(q => { if (q.topic === ghost.id) { q.topic = real.id; changed = true; } });
+
+    // Remove ghost from TOPICS
+    const gi = TOPICS.findIndex(t => t.id === ghost.id);
+    if (gi !== -1) { TOPICS.splice(gi, 1); changed = true; }
   });
 
-  // Remove ghost topics: custom topics left with 0 questions AND a same-label twin exists
-  for (let i = TOPICS.length - 1; i >= 0; i--) {
-    const t = TOPICS[i];
-    if (!t._custom || QBANK.some(q => q.topic === t.id)) continue;
-    const hasTwin = TOPICS.some((o, oi) => oi !== i && o.label === t.label && o.subjectId === t.subjectId);
-    if (hasTwin) { TOPICS.splice(i, 1); changed = true; }
-  }
+  // Also reassign any questions whose topic ID is completely absent from TOPICS
+  const topicIds = new Set(TOPICS.map(t => t.id));
+  QBANK.forEach(q => {
+    if (topicIds.has(q.topic)) return;
+    const base = q.topic.replace(/_\d{10,}$/, '').toLowerCase();
+    const target = TOPICS.find(t =>
+      t.label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') === base
+    );
+    if (target) { q.topic = target.id; changed = true; }
+  });
 
   if (changed) saveCustomTopics();
 }
