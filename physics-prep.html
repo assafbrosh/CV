@@ -4248,6 +4248,40 @@ function loadExtraQuestions() {
   } catch(e) {}
 }
 
+// ── DATA REPAIR ───────────────────────────────────────────────────────────────
+// Fixes corrupted data from old bug where admin-added questions got saved with
+// a label-derived topic ID (e.g. "power_1748000000") instead of the real topic ID.
+function repairDataCorruption() {
+  const topicIds = new Set(TOPICS.map(t => t.id));
+  const orphaned = QBANK.filter(q => !topicIds.has(q.topic));
+  if (!orphaned.length) return;
+
+  let changed = false;
+  orphaned.forEach(q => {
+    // Old saveCustomSubject() created IDs like: "power_1748000000000" (label + _ + timestamp)
+    const ghostBase = q.topic.replace(/_\d{10,}$/, '').toLowerCase();
+    const target = TOPICS.find(t => {
+      const labelNorm = t.label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+      return labelNorm === ghostBase;
+    });
+    if (target) {
+      q.topic = target.id;
+      if (!target._custom) target._custom = true; // mark custom so it saves
+      changed = true;
+    }
+  });
+
+  // Remove ghost topics: custom topics left with 0 questions AND a same-label twin exists
+  for (let i = TOPICS.length - 1; i >= 0; i--) {
+    const t = TOPICS[i];
+    if (!t._custom || QBANK.some(q => q.topic === t.id)) continue;
+    const hasTwin = TOPICS.some((o, oi) => oi !== i && o.label === t.label && o.subjectId === t.subjectId);
+    if (hasTwin) { TOPICS.splice(i, 1); changed = true; }
+  }
+
+  if (changed) saveCustomTopics();
+}
+
 // ── INIT ──────────────────────────────────────────────────────────────────────
 loadCustomSubjects();
 loadBuiltinOverrides();
@@ -4260,6 +4294,7 @@ loadExtraQuestions();
   dSubjs.forEach(id => { const i = SUBJECTS.findIndex(s => s.id === id); if (i !== -1) SUBJECTS.splice(i, 1); });
   dTopics.forEach(id => { const i = TOPICS.findIndex(t => t.id === id); if (i !== -1) TOPICS.splice(i, 1); });
 })();
+repairDataCorruption();
 loadProfiles();
 showProfileScreen();
 </script>
