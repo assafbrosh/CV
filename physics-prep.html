@@ -1003,21 +1003,39 @@
     <div id="admin-subjects-list"></div>
     <button class="add-subject-btn" id="admin-add-subject-btn" onclick="openNewSubjectModal()" style="margin-top:.5rem">+ Add Category</button>
 
-    <div class="admin-section-title" style="margin-top:1.5rem">📤 Export / Import Data</div>
+    <div class="admin-section-title" style="margin-top:1.5rem">☁️ Cloud Sync (GitHub)</div>
     <div class="data-transfer-box">
-      <p>Transfer all your data (subjects, questions, profiles, progress) between devices.</p>
+      <p>Your data is saved to GitHub and loads automatically on every device. Set your GitHub token once.</p>
+      <div class="ai-key-row" style="margin-bottom:.5rem;">
+        <input type="password" id="gh-token-input" class="ai-key-input" placeholder="GitHub Personal Access Token (repo scope)">
+        <button class="ai-key-save-btn" onclick="saveGitHubToken()">Save</button>
+      </div>
+      <div id="gh-token-status" class="ai-key-status"></div>
+      <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.75rem;">
+        <button class="data-export-btn" onclick="pushDataToGitHub()" style="background:#e8f0fe;border-color:#a8c7fa;color:var(--primary);">☁️ Push to Cloud</button>
+        <button class="data-export-btn" onclick="pullDataFromGitHub()" style="background:#e6f4ea;border-color:#81c995;color:#1e8e3e;">⬇️ Pull from Cloud</button>
+      </div>
+      <div id="gh-sync-status" style="margin-top:.5rem;font-size:.83rem;"></div>
+      <details style="margin-top:.75rem;">
+        <summary style="font-size:.8rem;color:var(--muted);cursor:pointer;">How to get a GitHub token</summary>
+        <ol style="font-size:.8rem;color:var(--muted);margin:.5rem 0 0 1rem;line-height:1.7;">
+          <li>Go to github.com → Settings → Developer settings → Personal access tokens → Tokens (classic)</li>
+          <li>Click "Generate new token (classic)"</li>
+          <li>Select scope: <strong>repo</strong></li>
+          <li>Copy the token and paste above</li>
+        </ol>
+      </details>
+    </div>
+
+    <div class="admin-section-title" style="margin-top:1.5rem">📁 Backup / Restore</div>
+    <div class="data-transfer-box">
       <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:.75rem;">
-        <button class="data-export-btn" onclick="exportAllData()">📤 Export to Clipboard</button>
-        <button class="data-export-btn" onclick="downloadAllData()" style="background:#e6f4ea;border-color:#81c995;color:#1e8e3e;">💾 Download as File</button>
+        <button class="data-export-btn" onclick="downloadAllData()" style="background:#e6f4ea;border-color:#81c995;color:#1e8e3e;">💾 Download Backup</button>
       </div>
-      <label style="font-size:.83rem;font-weight:600;color:var(--muted);display:block;margin-bottom:.35rem;">Import data (paste export code or drag a file):</label>
-      <textarea id="import-data-input" placeholder="Paste exported data here..." style="width:100%;min-height:80px;border:1.5px solid var(--border);border-radius:8px;padding:.65rem .9rem;font-size:.82rem;font-family:monospace;resize:vertical;"></textarea>
-      <div style="display:flex;gap:.6rem;margin-top:.5rem;flex-wrap:wrap;align-items:center;">
-        <button class="data-export-btn" onclick="importAllData()" style="background:#e8f0fe;border-color:#a8c7fa;color:var(--primary);">📥 Import Data</button>
-        <label class="data-export-btn" style="cursor:pointer;background:#f8f9fa;border-color:var(--border);color:var(--muted);">
-          📁 Import from File <input type="file" accept=".json" onchange="importFromFile(event)" style="display:none">
-        </label>
-      </div>
+      <label style="font-size:.83rem;font-weight:600;color:var(--muted);display:block;margin-bottom:.35rem;">Restore from backup file:</label>
+      <label class="data-export-btn" style="cursor:pointer;width:100%;justify-content:center;">
+        📁 Choose File <input type="file" accept=".json" onchange="importFromFile(event)" style="display:none">
+      </label>
       <div id="import-status" style="margin-top:.5rem;font-size:.83rem;"></div>
     </div>
   </div>
@@ -3382,6 +3400,7 @@ function openAdminPanel() {
   renderAdminTopicAssign(pid);
   renderAdminAISettings();
   renderAdminAllSubjects();
+  renderGHTokenStatus();
   document.getElementById('admin-overlay').classList.add('open');
 }
 
@@ -3738,23 +3757,103 @@ function closeAdminPanel() {
 }
 
 // ── EXPORT / IMPORT ──────────────────────────────────────────────────────────
+// ── CLOUD SYNC (GITHUB) ───────────────────────────────────────────────────────
+const GH_REPO = 'assafbrosh/CV';
+const GH_BRANCH = 'gh-pages';
+const GH_DATA_FILE = 'physprep-data.json';
+
+function getGitHubToken() {
+  return localStorage.getItem('physPrepGHToken') || '';
+}
+function saveGitHubToken() {
+  const val = document.getElementById('gh-token-input').value.trim();
+  if (!val) return;
+  localStorage.setItem('physPrepGHToken', val);
+  const el = document.getElementById('gh-token-status');
+  if (el) { el.className = 'ai-key-status set'; el.textContent = '✅ Token saved'; }
+}
+
+function renderGHTokenStatus() {
+  const el = document.getElementById('gh-token-status');
+  if (!el) return;
+  const t = getGitHubToken();
+  if (t) { el.className = 'ai-key-status set'; el.textContent = '✅ Token saved'; }
+  else    { el.className = 'ai-key-status unset'; el.textContent = 'No token set'; }
+}
+
 function collectAllData() {
   const keys = {};
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
-    if (k && k.startsWith('physPrep')) keys[k] = localStorage.getItem(k);
+    if (k && k.startsWith('physPrep') && k !== 'physPrepGHToken') keys[k] = localStorage.getItem(k);
   }
   return { version: 1, exportedAt: Date.now(), data: keys };
 }
 
-function exportAllData() {
-  const json = JSON.stringify(collectAllData());
-  navigator.clipboard.writeText(json).then(() => {
-    alert('✅ Data copied to clipboard!\n\nGo to the other device, open Admin → Export/Import, paste into the text box and click Import.');
-  }).catch(() => {
-    document.getElementById('import-data-input').value = json;
-    alert('Could not copy automatically — the data is now in the text box below. Copy it manually.');
-  });
+async function pushDataToGitHub() {
+  const token = getGitHubToken();
+  const status = document.getElementById('gh-sync-status');
+  if (!token) { status.innerHTML = '<span style="color:var(--danger)">❌ No token set.</span>'; return; }
+  status.innerHTML = '⏳ Pushing…';
+  try {
+    const content = btoa(unescape(encodeURIComponent(JSON.stringify(collectAllData(), null, 2))));
+    // Get current SHA if file exists
+    let sha = '';
+    const getRes = await fetch(`https://api.github.com/repos/${GH_REPO}/contents/${GH_DATA_FILE}?ref=${GH_BRANCH}`, {
+      headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json' }
+    });
+    if (getRes.ok) { const j = await getRes.json(); sha = j.sha || ''; }
+    const body = { message: 'Update physprep data', content, branch: GH_BRANCH };
+    if (sha) body.sha = sha;
+    const putRes = await fetch(`https://api.github.com/repos/${GH_REPO}/contents/${GH_DATA_FILE}`, {
+      method: 'PUT',
+      headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (!putRes.ok) { const e = await putRes.json(); throw new Error(e.message); }
+    localStorage.setItem('physPrepLastPush', Date.now().toString());
+    status.innerHTML = '<span style="color:var(--success)">✅ Pushed! All devices will load this data on next visit.</span>';
+  } catch(e) {
+    status.innerHTML = `<span style="color:var(--danger)">❌ ${e.message}</span>`;
+  }
+}
+
+async function pullDataFromGitHub(silent) {
+  const status = document.getElementById('gh-sync-status');
+  if (status && !silent) status.innerHTML = '⏳ Pulling…';
+  try {
+    const res = await fetch(`https://raw.githubusercontent.com/${GH_REPO}/${GH_BRANCH}/${GH_DATA_FILE}?t=${Date.now()}`);
+    if (!res.ok) { if (!silent) throw new Error('File not found. Push data first.'); return; }
+    const parsed = await res.json();
+    const data = parsed.data || parsed;
+    let count = 0;
+    Object.entries(data).forEach(([k, v]) => {
+      if (k.startsWith('physPrep') && k !== 'physPrepGHToken') { localStorage.setItem(k, v); count++; }
+    });
+    if (silent) { location.reload(); return; }
+    if (status) status.innerHTML = `<span style="color:var(--success)">✅ Pulled ${count} records. Reloading…</span>`;
+    setTimeout(() => location.reload(), 1000);
+  } catch(e) {
+    if (!silent && status) status.innerHTML = `<span style="color:var(--danger)">❌ ${e.message}</span>`;
+  }
+}
+
+// Auto-pull on startup if data file exists (silent — only reloads if data found)
+async function autoSyncOnStartup() {
+  try {
+    const res = await fetch(`https://raw.githubusercontent.com/${GH_REPO}/${GH_BRANCH}/${GH_DATA_FILE}?t=${Date.now()}`);
+    if (!res.ok) return;
+    const parsed = await res.json();
+    const data = parsed.data || parsed;
+    const remoteTs = parsed.exportedAt || 0;
+    const localTs = parseInt(localStorage.getItem('physPrepLastPush') || '0');
+    if (remoteTs <= localTs) return; // local is up to date
+    let count = 0;
+    Object.entries(data).forEach(([k, v]) => {
+      if (k.startsWith('physPrep') && k !== 'physPrepGHToken') { localStorage.setItem(k, v); count++; }
+    });
+    if (count > 0) location.reload();
+  } catch(e) { /* silent */ }
 }
 
 function downloadAllData() {
@@ -3772,33 +3871,24 @@ function importFromFile(evt) {
   const file = evt.target.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = e => {
-    document.getElementById('import-data-input').value = e.target.result;
-    importAllData();
-  };
+  reader.onload = e => { applyImportedData(e.target.result); };
   reader.readAsText(file);
 }
 
-function importAllData() {
-  const raw = document.getElementById('import-data-input').value.trim();
+function applyImportedData(raw) {
   const status = document.getElementById('import-status');
-  if (!raw) { status.innerHTML = '<span style="color:var(--danger)">Nothing to import.</span>'; return; }
   let parsed;
   try { parsed = JSON.parse(raw); } catch(e) {
-    status.innerHTML = '<span style="color:var(--danger)">❌ Invalid data — make sure you pasted the full export.</span>';
+    if (status) status.innerHTML = '<span style="color:var(--danger)">❌ Invalid file.</span>';
     return;
   }
   const data = parsed.data || parsed;
-  if (typeof data !== 'object') {
-    status.innerHTML = '<span style="color:var(--danger)">❌ Unrecognized format.</span>';
-    return;
-  }
   let count = 0;
   Object.entries(data).forEach(([k, v]) => {
-    if (k.startsWith('physPrep')) { localStorage.setItem(k, v); count++; }
+    if (k.startsWith('physPrep') && k !== 'physPrepGHToken') { localStorage.setItem(k, v); count++; }
   });
-  status.innerHTML = `<span style="color:var(--success)">✅ Imported ${count} records. Reloading…</span>`;
-  setTimeout(() => location.reload(), 1200);
+  if (status) status.innerHTML = `<span style="color:var(--success)">✅ Restored ${count} records. Reloading…</span>`;
+  setTimeout(() => location.reload(), 1000);
 }
 
 // ── BENCHMARK MATERIALS ───────────────────────────────────────────────────────
@@ -4633,6 +4723,7 @@ loadExtraQuestions();
 repairDataCorruption();
 loadProfiles();
 showProfileScreen();
+autoSyncOnStartup();
 </script>
 </body>
 </html>
