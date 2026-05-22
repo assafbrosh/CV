@@ -4054,15 +4054,12 @@ async function fetchGistContent(gistId, token) {
   const headers = { Accept: 'application/vnd.github.v3+json' };
   if (token) headers.Authorization = `token ${token}`;
   const res = await fetch(`https://api.github.com/gists/${gistId}`, { headers });
-  if (!res.ok) throw new Error('Could not fetch gist.');
+  if (!res.ok) throw new Error('Could not fetch gist (HTTP ' + res.status + ').');
   const j = await res.json();
   const fileInfo = j.files?.[GIST_FILENAME];
   if (!fileInfo) throw new Error('No data file in gist.');
-  // If truncated, fetch from raw_url for full content
-  if (fileInfo.truncated && fileInfo.raw_url) {
-    const rawRes = await fetch(fileInfo.raw_url, token ? { headers: { Authorization: `token ${token}` } } : {});
-    if (!rawRes.ok) throw new Error('Could not fetch full gist content.');
-    return { text: await rawRes.text(), gistMeta: j };
+  if (fileInfo.truncated) {
+    throw new Error('Cloud data is too large. Please open Admin on your PC and click "Push to Cloud" again — this will upload a compressed version that fits.');
   }
   return { text: fileInfo.content, gistMeta: j };
 }
