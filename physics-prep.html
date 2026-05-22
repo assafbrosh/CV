@@ -1021,7 +1021,7 @@
         <ol style="font-size:.8rem;color:var(--muted);margin:.5rem 0 0 1rem;line-height:1.7;">
           <li>Go to github.com → Settings → Developer settings → Personal access tokens → Tokens (classic)</li>
           <li>Click "Generate new token (classic)"</li>
-          <li>Select scope: <strong>repo</strong></li>
+          <li>Select scope: <strong>gist</strong></li>
           <li>Copy the token and paste above</li>
         </ol>
       </details>
@@ -3756,14 +3756,14 @@ function closeAdminPanel() {
   }
 }
 
-// ── EXPORT / IMPORT ──────────────────────────────────────────────────────────
-// ── CLOUD SYNC (GITHUB) ───────────────────────────────────────────────────────
-const GH_REPO = 'assafbrosh/CV';
-const GH_BRANCH = 'gh-pages';
-const GH_DATA_FILE = 'physprep-data.json';
+// ── CLOUD SYNC (GITHUB GIST) ──────────────────────────────────────────────────
+const GIST_FILENAME = 'physprep-data.json';
 
 function getGitHubToken() {
   return localStorage.getItem('physPrepGHToken') || '';
+}
+function getGistId() {
+  return localStorage.getItem('physPrepGistId') || '';
 }
 function saveGitHubToken() {
   const val = document.getElementById('gh-token-input').value.trim();
@@ -3777,15 +3777,18 @@ function renderGHTokenStatus() {
   const el = document.getElementById('gh-token-status');
   if (!el) return;
   const t = getGitHubToken();
-  if (t) { el.className = 'ai-key-status set'; el.textContent = '✅ Token saved'; }
-  else    { el.className = 'ai-key-status unset'; el.textContent = 'No token set'; }
+  const g = getGistId();
+  if (t && g) { el.className = 'ai-key-status set'; el.textContent = `✅ Token saved · Gist: ${g.slice(0,8)}…`; }
+  else if (t)  { el.className = 'ai-key-status set'; el.textContent = '✅ Token saved (push once to create gist)'; }
+  else         { el.className = 'ai-key-status unset'; el.textContent = 'No token set'; }
 }
 
 function collectAllData() {
   const keys = {};
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
-    if (k && k.startsWith('physPrep') && k !== 'physPrepGHToken') keys[k] = localStorage.getItem(k);
+    if (k && k.startsWith('physPrep') && k !== 'physPrepGHToken' && k !== 'physPrepGistId' && k !== 'physPrepLastPush')
+      keys[k] = localStorage.getItem(k);
   }
   return { version: 1, exportedAt: Date.now(), data: keys };
 }
@@ -3794,25 +3797,32 @@ async function pushDataToGitHub() {
   const token = getGitHubToken();
   const status = document.getElementById('gh-sync-status');
   if (!token) { status.innerHTML = '<span style="color:var(--danger)">❌ No token set.</span>'; return; }
-  status.innerHTML = '⏳ Pushing…';
+  status.innerHTML = '⏳ Saving to cloud…';
   try {
-    const content = btoa(unescape(encodeURIComponent(JSON.stringify(collectAllData(), null, 2))));
-    // Get current SHA if file exists
-    let sha = '';
-    const getRes = await fetch(`https://api.github.com/repos/${GH_REPO}/contents/${GH_DATA_FILE}?ref=${GH_BRANCH}`, {
-      headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json' }
-    });
-    if (getRes.ok) { const j = await getRes.json(); sha = j.sha || ''; }
-    const body = { message: 'Update physprep data', content, branch: GH_BRANCH };
-    if (sha) body.sha = sha;
-    const putRes = await fetch(`https://api.github.com/repos/${GH_REPO}/contents/${GH_DATA_FILE}`, {
-      method: 'PUT',
-      headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    if (!putRes.ok) { const e = await putRes.json(); throw new Error(e.message); }
+    const payload = { files: { [GIST_FILENAME]: { content: JSON.stringify(collectAllData(), null, 2) } } };
+    const gistId = getGistId();
+    let res;
+    if (gistId) {
+      res = await fetch(`https://api.github.com/gists/${gistId}`, {
+        method: 'PATCH',
+        headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    } else {
+      payload.description = 'Science Exam Prep data';
+      payload.public = false;
+      res = await fetch('https://api.github.com/gists', {
+        method: 'POST',
+        headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    }
+    if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+    const j = await res.json();
+    localStorage.setItem('physPrepGistId', j.id);
     localStorage.setItem('physPrepLastPush', Date.now().toString());
-    status.innerHTML = '<span style="color:var(--success)">✅ Pushed! All devices will load this data on next visit.</span>';
+    renderGHTokenStatus();
+    status.innerHTML = '<span style="color:var(--success)">✅ Saved to cloud! All devices will auto-sync on next visit.</span>';
   } catch(e) {
     status.innerHTML = `<span style="color:var(--danger)">❌ ${e.message}</span>`;
   }
@@ -3820,37 +3830,54 @@ async function pushDataToGitHub() {
 
 async function pullDataFromGitHub(silent) {
   const status = document.getElementById('gh-sync-status');
-  if (status && !silent) status.innerHTML = '⏳ Pulling…';
+  const gistId = getGistId();
+  if (!gistId) {
+    if (!silent && status) status.innerHTML = '<span style="color:var(--danger)">❌ No cloud data yet — push first.</span>';
+    return;
+  }
+  if (status && !silent) status.innerHTML = '⏳ Loading from cloud…';
   try {
-    const res = await fetch(`https://raw.githubusercontent.com/${GH_REPO}/${GH_BRANCH}/${GH_DATA_FILE}?t=${Date.now()}`);
-    if (!res.ok) { if (!silent) throw new Error('File not found. Push data first.'); return; }
-    const parsed = await res.json();
+    const res = await fetch(`https://api.github.com/gists/${gistId}`, {
+      headers: { Accept: 'application/vnd.github.v3+json' }
+    });
+    if (!res.ok) throw new Error('Could not fetch gist.');
+    const j = await res.json();
+    const raw = j.files?.[GIST_FILENAME]?.content;
+    if (!raw) throw new Error('No data file in gist.');
+    const parsed = JSON.parse(raw);
     const data = parsed.data || parsed;
     let count = 0;
     Object.entries(data).forEach(([k, v]) => {
-      if (k.startsWith('physPrep') && k !== 'physPrepGHToken') { localStorage.setItem(k, v); count++; }
+      if (k.startsWith('physPrep') && k !== 'physPrepGHToken' && k !== 'physPrepGistId') { localStorage.setItem(k, v); count++; }
     });
     if (silent) { location.reload(); return; }
-    if (status) status.innerHTML = `<span style="color:var(--success)">✅ Pulled ${count} records. Reloading…</span>`;
+    if (status) status.innerHTML = `<span style="color:var(--success)">✅ Loaded ${count} records. Reloading…</span>`;
     setTimeout(() => location.reload(), 1000);
   } catch(e) {
     if (!silent && status) status.innerHTML = `<span style="color:var(--danger)">❌ ${e.message}</span>`;
   }
 }
 
-// Auto-pull on startup if data file exists (silent — only reloads if data found)
+// Auto-pull on startup if a gist ID is known and remote is newer
 async function autoSyncOnStartup() {
+  const gistId = getGistId();
+  if (!gistId) return;
   try {
-    const res = await fetch(`https://raw.githubusercontent.com/${GH_REPO}/${GH_BRANCH}/${GH_DATA_FILE}?t=${Date.now()}`);
+    const res = await fetch(`https://api.github.com/gists/${gistId}`, {
+      headers: { Accept: 'application/vnd.github.v3+json' }
+    });
     if (!res.ok) return;
-    const parsed = await res.json();
-    const data = parsed.data || parsed;
+    const j = await res.json();
+    const raw = j.files?.[GIST_FILENAME]?.content;
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
     const remoteTs = parsed.exportedAt || 0;
     const localTs = parseInt(localStorage.getItem('physPrepLastPush') || '0');
-    if (remoteTs <= localTs) return; // local is up to date
+    if (remoteTs <= localTs) return;
+    const data = parsed.data || parsed;
     let count = 0;
     Object.entries(data).forEach(([k, v]) => {
-      if (k.startsWith('physPrep') && k !== 'physPrepGHToken') { localStorage.setItem(k, v); count++; }
+      if (k.startsWith('physPrep') && k !== 'physPrepGHToken' && k !== 'physPrepGistId') { localStorage.setItem(k, v); count++; }
     });
     if (count > 0) location.reload();
   } catch(e) { /* silent */ }
