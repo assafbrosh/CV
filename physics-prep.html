@@ -602,6 +602,50 @@
   }
   .data-export-btn:hover { border-color: var(--primary); background: #e8f0fe; }
 
+  /* Scroll quiz */
+  .scroll-q-card {
+    border-left: 4px solid var(--border);
+    transition: border-color .2s;
+    scroll-margin-top: 80px;
+  }
+  .scroll-q-card.sq-correct { border-left-color: var(--success); }
+  .scroll-q-card.sq-wrong   { border-left-color: var(--danger); }
+  .scroll-q-card.sq-unanswered { border-left-color: var(--border); }
+  .sq-num {
+    font-size: .78rem; font-weight: 700; color: var(--muted);
+    margin-bottom: .5rem; display: flex; align-items: center; gap: .5rem;
+  }
+  .sq-status-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--border); flex-shrink: 0;
+  }
+  .sq-status-dot.done-correct { background: var(--success); }
+  .sq-status-dot.done-wrong   { background: var(--danger); }
+  #sq-finish-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--card); border-radius: 12px;
+    padding: .75rem 1rem; margin-bottom: 1rem;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    position: sticky; top: 0; z-index: 20;
+    gap: .75rem; flex-wrap: wrap;
+  }
+  #sq-progress-text { font-size: .9rem; color: var(--muted); flex: 1; }
+  #sq-progress-text strong { color: var(--text); }
+  .sq-finish-btn {
+    background: var(--primary); color: white; border: none;
+    border-radius: 8px; padding: .55rem 1.4rem;
+    font-size: .9rem; font-weight: 700; cursor: pointer;
+    transition: background .2s;
+  }
+  .sq-finish-btn:hover { background: #1557b0; }
+  .sq-next-btn {
+    background: none; border: 1.5px solid var(--border);
+    border-radius: 8px; padding: .5rem 1rem;
+    font-size: .85rem; cursor: pointer; color: var(--primary);
+    transition: all .2s;
+  }
+  .sq-next-btn:hover { border-color: var(--primary); background: #e8f0fe; }
+
   /* Diagram */
   .q-diagram {
     margin: .75rem 0; background: #f8f9ff;
@@ -846,6 +890,8 @@
       padding: .75rem 1.5rem;
       font-size: .95rem;
     }
+    #sq-finish-bar { padding: .5rem .75rem; gap: .4rem; }
+    .sq-finish-btn, .sq-next-btn { padding: .45rem .9rem; font-size: .82rem; }
 
     .walkthrough ol li { font-size: .88rem; }
   }
@@ -2443,10 +2489,11 @@ function startQuiz() {
   state.selectedTopics = selected;
   state.topicStats = {};
   state.wrongAnswers = [];
+  state.scrollAnswered = {};
   selected.forEach(tid => { state.topicStats[tid] = { correct: 0, wrong: 0 }; });
   _setScreenVisibility('quiz-screen');
   buildTopicSwitcher(selected);
-  renderQuestion();
+  renderScrollQuiz();
 }
 
 function buildTopicSwitcher(selected) {
@@ -2586,6 +2633,260 @@ function renderQuestion() {
     inputArea.innerHTML = `<p style="color:var(--danger);padding:.5rem">⚠ Could not render question: ${err.message}</p>`;
     console.error('renderQuestion error:', err, q);
   }
+}
+
+// ── SCROLL QUIZ ───────────────────────────────────────────────────────────────
+function renderScrollQuiz() {
+  updateHeader();
+  _setScreenVisibility('quiz-screen');
+  const area = document.getElementById('question-area');
+  area.innerHTML = '';
+
+  // Sticky progress/finish bar
+  const bar = document.createElement('div');
+  bar.id = 'sq-finish-bar';
+  bar.innerHTML = `
+    <span id="sq-progress-text"><strong>0</strong> / ${state.queue.length} answered</span>
+    <button class="sq-next-btn" onclick="scrollToNextUnanswered()">↓ Next unanswered</button>
+    <button class="sq-finish-btn" onclick="finishScrollQuiz()">Finish →</button>`;
+  area.appendChild(bar);
+
+  // Render all question cards
+  state.queue.forEach((q, idx) => {
+    area.appendChild(_buildScrollCard(q, idx));
+  });
+}
+
+function _buildScrollCard(q, idx) {
+  const card = document.createElement('div');
+  card.className = 'card scroll-q-card sq-unanswered';
+  card.id = `sqcard-${idx}`;
+
+  const topicInfo = TOPICS.find(t => t.id === q.topic);
+  const typeLabels = { mc:'Multiple Choice', sa:'Short Answer', calc:'Calculation', tf:'True / False', chal:'Challenge' };
+  const typeBadges = { mc:'badge-mc', sa:'badge-sa', calc:'badge-calc', tf:'badge-tf', chal:'badge-chal' };
+
+  card.innerHTML = `
+    <div class="sq-num">
+      <span class="sq-status-dot" id="sqdot-${idx}"></span>
+      Q${idx + 1} of ${state.queue.length}
+      ${topicInfo ? `<span class="topic-tag">${topicInfo.icon} ${topicInfo.label}</span>` : ''}
+      <span class="badge ${typeBadges[q.type]||'badge-mc'}" style="margin-left:auto">${typeLabels[q.type]||q.type}</span>
+    </div>
+    ${q._review ? `<div class="review-label">↩ Review — got this wrong before</div>` : ''}
+    ${topicInfo?.theory ? `<div class="theory-panel">
+      <button class="theory-toggle" type="button" onclick="toggleTheory(this)">
+        📖 Theory: ${topicInfo.label} <span class="theory-arrow">▼</span>
+      </button>
+      <div class="theory-body">${topicInfo.theory}</div>
+    </div>` : ''}
+    <div class="q-text">${q.question}</div>
+    ${q.formula ? `<div class="formula-hint"><strong>Formula hint</strong>${q.formula}</div>` : ''}
+    ${q.exerciseImage ? `<div class="exercise-img-wrap">
+      <button class="exercise-toggle-btn" onclick="toggleExerciseImg(this)">📎 View Exercise</button>
+      <img class="exercise-img" src="${q.exerciseImage}" alt="Exercise">
+    </div>` : ''}
+    ${q.diagram ? `<div class="q-diagram">${renderDiagramSVG(q.diagram)}</div>` : ''}
+    <div id="sq-input-${idx}"></div>
+    <div id="sq-feedback-${idx}"></div>`;
+
+  const inputArea = card.querySelector(`#sq-input-${idx}`);
+  try {
+    if (q.type === 'mc' || (!q.type && q.options)) _sqRenderMC(q, idx, inputArea);
+    else if (q.type === 'tf')   _sqRenderTF(q, idx, inputArea);
+    else if (q.type === 'calc') _sqRenderCalc(q, idx, inputArea);
+    else if (q.type === 'sa')   _sqRenderSA(q, idx, inputArea);
+  } catch(e) {
+    inputArea.innerHTML = `<p style="color:var(--danger)">⚠ ${e.message}</p>`;
+  }
+  return card;
+}
+
+function _sqRenderMC(q, idx, container) {
+  const letters = ['A','B','C','D'];
+  const div = document.createElement('div'); div.className = 'options';
+  (q.options||[]).forEach((opt, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'option-btn';
+    btn.innerHTML = `<span class="opt-letter">${letters[i]}</span><span>${opt}</span>`;
+    btn.onclick = () => _sqCheckMC(q, idx, i, div);
+    div.appendChild(btn);
+  });
+  container.appendChild(div);
+}
+
+function _sqCheckMC(q, idx, chosen, optDiv) {
+  if (state.scrollAnswered[idx]) return;
+  const btns = optDiv.querySelectorAll('.option-btn');
+  btns.forEach(b => b.disabled = true);
+  const correct = chosen === q.answer;
+  btns[chosen].classList.add(correct ? 'correct' : 'wrong');
+  if (!correct) btns[q.answer].classList.add('correct');
+  _sqRecordAnswer(q, idx, correct);
+}
+
+function _sqRenderTF(q, idx, container) {
+  const row = document.createElement('div'); row.className = 'tf-row';
+  ['True','False'].forEach(label => {
+    const btn = document.createElement('button');
+    btn.className = 'tf-btn'; btn.textContent = label;
+    btn.onclick = () => {
+      if (state.scrollAnswered[idx]) return;
+      row.querySelectorAll('.tf-btn').forEach(b => b.disabled = true);
+      const chosen = label === 'True';
+      const correct = chosen === q.answer;
+      btn.classList.add(correct ? 'correct' : 'wrong');
+      if (!correct) row.querySelector(`.tf-btn:${q.answer ? 'first-child' : 'last-child'}`).classList.add('correct');
+      _sqRecordAnswer(q, idx, correct);
+    };
+    row.appendChild(btn);
+  });
+  container.appendChild(row);
+}
+
+function _sqRenderCalc(q, idx, container) {
+  const wrap = document.createElement('div'); wrap.className = 'text-input-wrap';
+  const inp = document.createElement('input');
+  inp.type = 'text'; inp.className = 'answer-input calc-input';
+  inp.placeholder = `Answer${q.unit ? ' in ' + q.unit : ''}…`;
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter') checkBtn.click(); });
+  const checkBtn = document.createElement('button');
+  checkBtn.className = 'submit-btn'; checkBtn.textContent = 'Check';
+  checkBtn.onclick = () => {
+    if (state.scrollAnswered[idx]) return;
+    const val = parseFloat(inp.value.replace(',', '.'));
+    const correct = !isNaN(val) && Math.abs(val - parseFloat(q.answer)) <= (parseFloat(q.answer) * (q.tolerance||0.01) + 0.001);
+    inp.disabled = true; checkBtn.disabled = true;
+    _sqRecordAnswer(q, idx, correct);
+  };
+  wrap.appendChild(inp); wrap.appendChild(checkBtn);
+  container.appendChild(wrap);
+}
+
+function _sqRenderSA(q, idx, container) {
+  const wrap = document.createElement('div'); wrap.className = 'text-input-wrap';
+  const ta = document.createElement('textarea');
+  ta.className = 'answer-input'; ta.placeholder = 'Your answer…';
+  const checkBtn = document.createElement('button');
+  checkBtn.className = 'submit-btn'; checkBtn.textContent = 'Check';
+  checkBtn.onclick = () => {
+    if (state.scrollAnswered[idx]) return;
+    const answer = ta.value.trim().toLowerCase();
+    const hits = (q.keywords||[]).filter(k => answer.includes(k.toLowerCase()));
+    const correct = hits.length >= Math.ceil((q.keywords||[]).length * 0.6);
+    ta.disabled = true; checkBtn.disabled = true;
+    _sqRecordAnswer(q, idx, correct, hits);
+  };
+  wrap.appendChild(ta); wrap.appendChild(checkBtn);
+  container.appendChild(wrap);
+}
+
+function _sqRecordAnswer(q, idx, correct, hits) {
+  if (state.scrollAnswered[idx]) return;
+  state.scrollAnswered[idx] = { correct };
+  if (correct) state.correct++; else state.wrong++;
+
+  // Track topic stats + persist
+  const topic = q.topic;
+  if (topic && state.topicStats[topic]) {
+    if (correct) state.topicStats[topic].correct++;
+    else {
+      state.topicStats[topic].wrong++;
+      if (!state.wrongAnswers.find(w => w.id === q.id)) state.wrongAnswers.push(q);
+    }
+  }
+  if (state.profileId && topic && !q._review) {
+    const pStats = getPersistedStats(state.profileId);
+    if (!pStats[topic]) pStats[topic] = { correct: 0, wrong: 0 };
+    if (correct) pStats[topic].correct++;
+    else {
+      pStats[topic].wrong++;
+      const log = getWrongLog(state.profileId);
+      const baseId = (q.id||'').replace(/_rev$/, '');
+      if (baseId && !log.find(w => w.id === baseId)) {
+        log.push({ ...q, id: baseId, timestamp: Date.now() });
+        saveWrongLog(state.profileId, log);
+      }
+    }
+    savePersistedStats(state.profileId, pStats);
+    if (q.id && !q._review) markUsed(topic, q.id);
+  }
+
+  // Update card styling
+  const card = document.getElementById(`sqcard-${idx}`);
+  if (card) {
+    card.classList.remove('sq-unanswered');
+    card.classList.add(correct ? 'sq-correct' : 'sq-wrong');
+  }
+  const dot = document.getElementById(`sqdot-${idx}`);
+  if (dot) dot.className = `sq-status-dot ${correct ? 'done-correct' : 'done-wrong'}`;
+
+  // Show inline feedback
+  _sqShowFeedback(q, idx, correct, hits);
+
+  // Update progress bar
+  _sqUpdateProgress();
+  updateHeader();
+}
+
+function _sqShowFeedback(q, idx, correct, hits) {
+  const area = document.getElementById(`sq-feedback-${idx}`);
+  if (!area) return;
+  const fb = document.createElement('div');
+  fb.className = `feedback ${correct ? 'correct-fb' : 'wrong-fb'}`;
+  let wtHtml = '';
+  if (!correct && q.walkthrough?.length) {
+    wtHtml = `<div class="walkthrough"><strong>Step-by-step</strong><ol>${q.walkthrough.map(s=>`<li>${s}</li>`).join('')}</ol></div>`;
+  }
+  if (correct) {
+    fb.innerHTML = `<div class="feedback-title">Correct! ✓</div><p>${q.explanation||''}</p>`;
+  } else if (q.type === 'sa' && hits) {
+    fb.innerHTML = `<div class="feedback-title">Not quite. ✗</div>
+      <p>You mentioned ${hits.length}/${q.keywords.length} key concepts.</p>
+      <p><strong>Model answer:</strong> ${q.answer}</p>
+      <p>${q.explanation||''}</p>${wtHtml}`;
+  } else {
+    fb.innerHTML = `<div class="feedback-title">Incorrect. ✗</div>
+      <p><strong>Correct answer:</strong> ${getCorrectAnswerText(q)}</p>
+      <p>${q.explanation||''}</p>${wtHtml}`;
+  }
+  area.appendChild(fb);
+}
+
+function _sqUpdateProgress() {
+  const done = Object.keys(state.scrollAnswered).length;
+  const total = state.queue.length;
+  const el = document.getElementById('sq-progress-text');
+  if (el) el.innerHTML = `<strong>${done}</strong> / ${total} answered`;
+  // Update score bar
+  updateHeader();
+}
+
+function scrollToNextUnanswered() {
+  const idx = state.queue.findIndex((_, i) => !state.scrollAnswered[i]);
+  if (idx === -1) {
+    finishScrollQuiz();
+    return;
+  }
+  const card = document.getElementById(`sqcard-${idx}`);
+  if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function finishScrollQuiz() {
+  // Treat unanswered as wrong for results
+  state.queue.forEach((q, i) => {
+    if (!state.scrollAnswered[i]) {
+      state.wrong++;
+      const topic = q.topic;
+      if (topic && state.topicStats[topic]) state.topicStats[topic].wrong++;
+    }
+  });
+  // Update adaptive difficulty
+  state.selectedTopics?.forEach(tid => {
+    const s = state.topicStats[tid];
+    if (s) updateDifficultyAfterSession(state.profileId, tid, s.correct, s.correct + s.wrong);
+  });
+  showResults();
 }
 
 // ── DIAGRAM RENDERING ─────────────────────────────────────────────────────────
@@ -3147,10 +3448,11 @@ function practiceMore() {
   state.awaitingSimilar = false; state.currentSimilar = null;
   state.topicStats = {};
   state.wrongAnswers = [];
+  state.scrollAnswered = {};
   selected.forEach(tid => { state.topicStats[tid] = { correct: 0, wrong: 0 }; });
   _setScreenVisibility('quiz-screen');
   buildTopicSwitcher(selected);
-  renderQuestion();
+  renderScrollQuiz();
 }
 
 // ── ADD SUBJECT MODAL ─────────────────────────────────────────────────────────
