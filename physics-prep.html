@@ -3985,13 +3985,27 @@ function renderGHTokenStatus() {
   else         { el.className = 'ai-key-status unset'; el.textContent = 'No token set'; }
 }
 
-function collectAllData() {
+function collectAllData({ forCloud = false } = {}) {
   const keys = {};
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
-    if (k && k.startsWith('physPrep') && k !== 'physPrepGHToken' && k !== 'physPrepGistId' && k !== 'physPrepLastPush')
-      keys[k] = localStorage.getItem(k);
+    if (!k || !k.startsWith('physPrep')) continue;
+    if (k === 'physPrepGHToken' || k === 'physPrepGistId' || k === 'physPrepLastPush') continue;
+    // Exclude large binary data from cloud sync (benchmarks are local reference materials)
+    if (forCloud && k.startsWith('physPrepBenchmarks_')) continue;
+    keys[k] = localStorage.getItem(k);
   }
+
+  // For cloud sync, also strip exerciseImage (base64) from question data to save space
+  if (forCloud && keys['physPrepExtraQuestions']) {
+    try {
+      const qs = JSON.parse(keys['physPrepExtraQuestions']);
+      keys['physPrepExtraQuestions'] = JSON.stringify(
+        qs.map(q => { const c = {...q}; delete c.exerciseImage; return c; })
+      );
+    } catch(e) { /* leave as-is */ }
+  }
+
   return { version: 1, exportedAt: Date.now(), data: keys };
 }
 
@@ -4001,7 +4015,13 @@ async function pushDataToGitHub() {
   if (!token) { status.innerHTML = '<span style="color:var(--danger)">❌ No token set.</span>'; return; }
   status.innerHTML = '⏳ Saving to cloud…';
   try {
-    const payload = { files: { [GIST_FILENAME]: { content: JSON.stringify(collectAllData(), null, 2) } } };
+    const content = JSON.stringify(collectAllData({ forCloud: true }), null, 2);
+    const sizeMB = (new Blob([content]).size / 1024 / 1024).toFixed(1);
+    if (parseFloat(sizeMB) > 8) {
+      status.innerHTML = `<span style="color:var(--danger)">❌ Data too large (${sizeMB}MB). Remove some benchmark images first.</span>`;
+      return;
+    }
+    const payload = { files: { [GIST_FILENAME]: { content } } };
     const gistId = getGistId();
     let res;
     if (gistId) {
