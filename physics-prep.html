@@ -3828,12 +3828,40 @@ async function pushDataToGitHub() {
   }
 }
 
+async function findGistByFilename(token) {
+  let page = 1;
+  while (page <= 5) {
+    const res = await fetch(`https://api.github.com/gists?per_page=100&page=${page}`, {
+      headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json' }
+    });
+    if (!res.ok) return null;
+    const list = await res.json();
+    if (!list.length) return null;
+    const found = list.find(g => g.files && g.files[GIST_FILENAME]);
+    if (found) return found.id;
+    if (list.length < 100) return null;
+    page++;
+  }
+  return null;
+}
+
 async function pullDataFromGitHub(silent) {
   const status = document.getElementById('gh-sync-status');
-  const gistId = getGistId();
+  let gistId = getGistId();
+  const token = getGitHubToken();
+
   if (!gistId) {
-    if (!silent && status) status.innerHTML = '<span style="color:var(--danger)">❌ No cloud data yet — push first.</span>';
-    return;
+    if (!token) {
+      if (!silent && status) status.innerHTML = '<span style="color:var(--danger)">❌ Enter your token and try again.</span>';
+      return;
+    }
+    if (status && !silent) status.innerHTML = '⏳ Looking for your cloud data…';
+    gistId = await findGistByFilename(token);
+    if (!gistId) {
+      if (!silent && status) status.innerHTML = '<span style="color:var(--danger)">❌ No cloud data found. Push from your PC first.</span>';
+      return;
+    }
+    localStorage.setItem('physPrepGistId', gistId);
   }
   if (status && !silent) status.innerHTML = '⏳ Loading from cloud…';
   try {
@@ -3858,14 +3886,19 @@ async function pullDataFromGitHub(silent) {
   }
 }
 
-// Auto-pull on startup if a gist ID is known and remote is newer
+// Auto-pull on startup if a gist ID is known (or discoverable) and remote is newer
 async function autoSyncOnStartup() {
-  const gistId = getGistId();
+  let gistId = getGistId();
+  const token = getGitHubToken();
+  if (!gistId && token) {
+    gistId = await findGistByFilename(token).catch(() => null);
+    if (gistId) localStorage.setItem('physPrepGistId', gistId);
+  }
   if (!gistId) return;
   try {
-    const res = await fetch(`https://api.github.com/gists/${gistId}`, {
-      headers: { Accept: 'application/vnd.github.v3+json' }
-    });
+    const headers = { Accept: 'application/vnd.github.v3+json' };
+    if (token) headers.Authorization = `token ${token}`;
+    const res = await fetch(`https://api.github.com/gists/${gistId}`, { headers });
     if (!res.ok) return;
     const j = await res.json();
     const raw = j.files?.[GIST_FILENAME]?.content;
