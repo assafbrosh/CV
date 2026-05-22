@@ -4108,6 +4108,8 @@ async function pullDataFromGitHub(silent) {
     Object.entries(data).forEach(([k, v]) => {
       if (k.startsWith('physPrep') && k !== 'physPrepGHToken' && k !== 'physPrepGistId') { localStorage.setItem(k, v); count++; }
     });
+    // Mark local as up-to-date to prevent auto-sync loop on next load
+    localStorage.setItem('physPrepLastPush', (parsed.exportedAt || Date.now()).toString());
     if (silent) { location.reload(); return; }
     if (status) status.innerHTML = `<span style="color:var(--success)">✅ Loaded ${count} records. Reloading…</span>`;
     setTimeout(() => location.reload(), 1000);
@@ -4136,6 +4138,8 @@ async function autoSyncOnStartup() {
     Object.entries(data).forEach(([k, v]) => {
       if (k.startsWith('physPrep') && k !== 'physPrepGHToken' && k !== 'physPrepGistId') { localStorage.setItem(k, v); count++; }
     });
+    // Mark local as up-to-date so we don't reload on next visit
+    localStorage.setItem('physPrepLastPush', remoteTs.toString());
     if (count > 0) location.reload();
   } catch(e) { /* silent */ }
 }
