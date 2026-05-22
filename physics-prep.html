@@ -4430,16 +4430,19 @@ function renderAdminBenchmarks(topicId) {
 
   if (existingQs.length >= 1) {
     html += `
-    <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-top:.5rem;padding-top:.5rem;border-top:1px dashed var(--border)">
-      <span style="font-size:.82rem;color:var(--muted);flex-shrink:0">Generate more like existing:</span>
-      <select id="gen-diff-${topicId}" style="font-size:.82rem;padding:.25rem .5rem;border:1.5px solid var(--border);border-radius:6px;background:#fff">
-        <option value="easy">🟢 Easy</option>
-        <option value="medium" selected>🟡 Medium</option>
-        <option value="hard">🔴 Hard</option>
-      </select>
-      <button class="admin-gen-btn" id="gen-ex-btn-${topicId}" onclick="generateQuestionsFromExamples('${topicId}')">
-        ✨ Generate from Examples
-      </button>
+    <div style="margin-top:.5rem;padding-top:.5rem;border-top:1px dashed var(--border)">
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
+        <span style="font-size:.82rem;color:var(--muted);flex-shrink:0">Generate more like existing:</span>
+        <select id="gen-diff-${topicId}" style="font-size:.82rem;padding:.25rem .5rem;border:1.5px solid var(--border);border-radius:6px;background:#fff">
+          <option value="easy">🟢 Easy</option>
+          <option value="medium" selected>🟡 Medium</option>
+          <option value="hard">🔴 Hard</option>
+        </select>
+        <button class="admin-gen-btn" id="gen-ex-btn-${topicId}" onclick="generateQuestionsFromExamples('${topicId}')">
+          ✨ Generate from Examples
+        </button>
+      </div>
+      <div id="gen-ex-status-${topicId}" style="font-size:.8rem;margin-top:.3rem"></div>
     </div>`;
   }
 
@@ -4728,15 +4731,18 @@ The "answer" field is the 0-based index of the correct option.`;
 
 // ── GENERATE FROM EXISTING QUESTIONS ──────────────────────────────────────────
 async function generateQuestionsFromExamples(topicId) {
+  const statusEl = document.getElementById(`gen-ex-status-${topicId}`);
+  const setStatus = (msg, color='var(--muted)') => { if (statusEl) statusEl.innerHTML = `<span style="color:${color}">${msg}</span>`; };
+
   const existingQs = QBANK.filter(q => q.topic === topicId);
-  if (!existingQs.length) { alert('No existing questions found for this topic.'); return; }
+  if (!existingQs.length) { setStatus('❌ No questions found for this topic.', 'var(--danger)'); return; }
 
   const provider   = getAIProvider();
   const storageKey = provider === 'openai' ? 'physPrepAIKey' : 'physPrepAIKeyAnthropic';
   const apiKey     = (localStorage.getItem(storageKey) || '').trim();
   if (!apiKey) {
     const name = provider === 'openai' ? 'OpenAI' : 'Anthropic';
-    alert(`Please set your ${name} API key in the AI Settings section of the Admin Panel.`);
+    setStatus(`❌ No ${name} API key set — add it in AI Settings above.`, 'var(--danger)');
     return;
   }
 
@@ -4750,8 +4756,9 @@ async function generateQuestionsFromExamples(topicId) {
     hard:   'challenging analysis, complex calculations and critical thinking (Year 10–11 level)'
   }[difficulty] || 'moderate difficulty';
 
-  const setBtn = t => { if (btn) { btn.textContent = t; btn.disabled = !!t.match(/^⏳/); } };
+  const setBtn = t => { if (btn) { btn.textContent = t; btn.disabled = t.startsWith('⏳'); } };
   setBtn('⏳ Generating…');
+  setStatus('⏳ Contacting AI, please wait…');
 
   // Build few-shot examples from existing questions (up to 5 to keep prompt concise)
   const samples = existingQs.slice(0, 5).map(q => ({
@@ -4830,10 +4837,12 @@ The "answer" field is the 0-based index of the correct option.`;
     if (!match) throw new Error('No JSON array found in response. Try again.');
     const generated = JSON.parse(match[0]);
     if (!Array.isArray(generated) || !generated.length) throw new Error('Empty question list returned.');
+    setStatus('');
     showGenReviewModal(topicId, generated);
 
   } catch(e) {
-    alert(`Generation failed: ${e.message}`);
+    setStatus(`❌ ${e.message}`, 'var(--danger)');
+    console.error('generateQuestionsFromExamples error:', e);
   } finally {
     setBtn('✨ Generate from Examples');
   }
