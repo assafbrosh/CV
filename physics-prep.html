@@ -4768,6 +4768,17 @@ async function generateQuestionsFromExamples(topicId) {
     explanation: q.explanation || '',
   }));
 
+  // Detect if topic benefits from geometric diagrams
+  const topicText = ((topic?.label || '') + ' ' + (topic?.desc || '') + ' ' + topicId).toLowerCase();
+  const needsDiagram = /trig|triangle|pythag|geometry|angle|sin|cos|tan|circle|shape|area|perimeter|coordin|graph|vector|bearing/.test(topicText);
+
+  const diagramInstructions = needsDiagram ? `
+- For questions involving triangles, include a "diagram" field with this exact structure:
+  For a right triangle: {"type":"right_triangle","a":"opposite side label or value","b":"adjacent label","c":"hypotenuse label","angleA":"angle at A or ?","angleB":"angle at B"}
+  For a general triangle: {"type":"triangle","a":"side a","b":"side b","c":"side c","angleA":"angle A","angleB":"angle B","angleC":"angle C"}
+  For a circle: {"type":"circle","radius":"r label","diameter":"d label","showDiameter":true/false}
+  Use "?" for the unknown value the student must find. Omit "diagram" if the question does not need a shape.` : '';
+
   const promptText = `You are a teacher creating quiz questions for Year 9 students about "${topic?.label || topicId}"${topic?.theory ? `. The topic covers: ${topic.theory.replace(/<[^>]+>/g,' ').trim()}` : ''}.
 
 Here are ${samples.length} example question(s) already in this topic (use them to understand the style, scope and subject matter — do NOT repeat them):
@@ -4777,7 +4788,7 @@ ${JSON.stringify(samples, null, 2)}
 Generate 8 NEW multiple-choice questions at ${diffInstruction}. The new questions must:
 - Cover the same subject matter but be clearly different from the examples above
 - Match the difficulty level specified (${difficulty})
-- Be varied (different question styles, different concepts within the topic)
+- Be varied (different question styles, different concepts within the topic)${diagramInstructions}
 
 Return ONLY a valid JSON array — no markdown, no explanation, just the array:
 
@@ -4787,11 +4798,12 @@ Return ONLY a valid JSON array — no markdown, no explanation, just the array:
     "options": ["Option A","Option B","Option C","Option D"],
     "answer": 0,
     "explanation": "Why the correct answer is right",
-    "walkthrough": ["Step 1","Step 2","Step 3"]
+    "walkthrough": ["Step 1","Step 2","Step 3"],
+    "diagram": null
   }
 ]
 
-The "answer" field is the 0-based index of the correct option.`;
+The "answer" field is the 0-based index of the correct option. Set "diagram" to null if no shape is needed.`;
 
   try {
     let responseText;
@@ -4859,8 +4871,10 @@ function showGenReviewModal(topicId, questions) {
     const div = document.createElement('div');
     div.className = 'gen-q-item selected';
     div.dataset.idx = i;
+    const diagSvg = (q.diagram?.type) ? `<div style="margin:.4rem 0;text-align:center;background:#f8f9ff;border-radius:8px;padding:.4rem">${renderDiagramSVG(q.diagram)}</div>` : '';
     div.innerHTML = `
       <div class="gq-question">${i+1}. ${q.question}</div>
+      ${diagSvg}
       <div class="gq-options">${(q.options||[]).map((o,oi) => `${['A','B','C','D'][oi]}. ${o}`).join(' &nbsp;·&nbsp; ')}</div>
       <div class="gq-correct">✓ ${(q.options||[])[q.answer] || ''}</div>`;
     div.addEventListener('click', () => div.classList.toggle('selected'));
@@ -4888,6 +4902,7 @@ function saveGeneratedQuestions() {
       question: q.question, options: q.options, answer: q.answer,
       explanation: q.explanation || '', walkthrough: q.walkthrough || [],
     };
+    if (q.diagram && q.diagram.type) newQ.diagram = q.diagram;
     QBANK.push(newQ);
     added++;
   });
