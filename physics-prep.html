@@ -602,6 +602,19 @@
   }
   .data-export-btn:hover { border-color: var(--primary); background: #e8f0fe; }
 
+  /* Diagram */
+  .q-diagram {
+    margin: .75rem 0; background: #f8f9ff;
+    border: 1.5px solid #c5d8ff; border-radius: 10px;
+    padding: .5rem; text-align: center;
+  }
+  .q-diagram svg { display: block; margin: 0 auto; }
+  .diag-field-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: .4rem; margin-top: .35rem;
+  }
+  .diag-field-grid label { font-size: .78rem; color: var(--muted); display: block; margin-bottom: .15rem; }
+  .diag-field-grid input { width: 100%; border: 1.5px solid var(--border); border-radius: 6px; padding: .35rem .5rem; font-size: .85rem; }
+
   /* Exercise image */
   .exercise-img-wrap { margin: .8rem 0; }
   .exercise-toggle-btn {
@@ -2542,6 +2555,7 @@ function renderQuestion() {
       <button class="exercise-toggle-btn" onclick="toggleExerciseImg(this)">📎 View Exercise</button>
       <img class="exercise-img" src="${q.exerciseImage}" alt="Exercise">
     </div>` : ''}
+    ${q.diagram ? `<div class="q-diagram">${renderDiagramSVG(q.diagram)}</div>` : ''}
     <div id="input-area"></div>
     <div id="feedback-area"></div>
   `;
@@ -2572,6 +2586,177 @@ function renderQuestion() {
     inputArea.innerHTML = `<p style="color:var(--danger);padding:.5rem">⚠ Could not render question: ${err.message}</p>`;
     console.error('renderQuestion error:', err, q);
   }
+}
+
+// ── DIAGRAM RENDERING ─────────────────────────────────────────────────────────
+function renderDiagramSVG(d) {
+  if (!d || !d.type) return '';
+  try {
+    if (d.type === 'right_triangle') return _svgRightTriangle(d);
+    if (d.type === 'triangle')       return _svgTriangle(d);
+    if (d.type === 'coordinate')     return _svgCoordinate(d);
+    if (d.type === 'circle')         return _svgCircle(d);
+  } catch(e) { return ''; }
+  return '';
+}
+
+function _svgRightTriangle(d) {
+  const W=300, H=210, pad=44;
+  const x1=pad, y1=H-pad;           // vertex A (angle α)
+  const x2=W-pad, y2=H-pad;         // vertex C (right angle)
+  const x3=W-pad, y3=pad;           // vertex B (angle β)
+  const rs=13;
+  const hl = v => d.highlight === v ? '#e37400' : '#1a73e8';
+  let s = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:300px">`;
+  // sides
+  s += `<line x1="${x1}" y1="${y1}" x2="${x3}" y2="${y3}" stroke="${hl('c')}" stroke-width="2.2"/>`;
+  s += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${hl('b')}" stroke-width="2.2"/>`;
+  s += `<line x1="${x2}" y1="${y2}" x2="${x3}" y2="${y3}" stroke="${hl('a')}" stroke-width="2.2"/>`;
+  // right-angle box
+  s += `<rect x="${x2-rs}" y="${y2-rs}" width="${rs}" height="${rs}" fill="none" stroke="#1a73e8" stroke-width="1.5"/>`;
+  // side labels
+  const mx=(x1+x3)/2, my=(y1+y3)/2;
+  if (d.c) s += `<text x="${mx-16}" y="${my}" font-size="14" fill="#202124" font-weight="700" text-anchor="middle">${d.c}</text>`;
+  if (d.b) s += `<text x="${(x1+x2)/2}" y="${y1+20}" font-size="14" fill="#202124" font-weight="700" text-anchor="middle">${d.b}</text>`;
+  if (d.a) s += `<text x="${x2+14}" y="${(y2+y3)/2+5}" font-size="14" fill="#202124" font-weight="700">${d.a}</text>`;
+  // angle labels
+  if (d.angleA) s += `<text x="${x1+6}" y="${y1-10}" font-size="12" fill="#5f6368">${d.angleA}</text>`;
+  if (d.angleB) s += `<text x="${x3-38}" y="${y3+18}" font-size="12" fill="#5f6368">${d.angleB}</text>`;
+  s += `<text x="${x2-rs-24}" y="${y2-2}" font-size="11" fill="#5f6368">90°</text>`;
+  return s + '</svg>';
+}
+
+function _svgTriangle(d) {
+  const W=300, H=210, pad=40;
+  const ax=pad, ay=H-pad, bx=W-pad, by=H-pad, cx=W/2, cy=pad+10;
+  let s = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:300px">`;
+  s += `<polygon points="${ax},${ay} ${bx},${by} ${cx},${cy}" fill="none" stroke="#1a73e8" stroke-width="2.2"/>`;
+  // vertex labels
+  s += `<text x="${ax-16}" y="${ay+5}" font-size="13" fill="#5f6368" font-weight="700">A</text>`;
+  s += `<text x="${bx+5}" y="${by+5}" font-size="13" fill="#5f6368" font-weight="700">B</text>`;
+  s += `<text x="${cx-5}" y="${cy-10}" font-size="13" fill="#5f6368" font-weight="700">C</text>`;
+  // side labels: a=BC, b=AC, c=AB
+  if (d.a) s += `<text x="${(bx+cx)/2+10}" y="${(by+cy)/2}" font-size="14" fill="#202124" font-weight="700">${d.a}</text>`;
+  if (d.b) s += `<text x="${(ax+cx)/2-22}" y="${(ay+cy)/2}" font-size="14" fill="#202124" font-weight="700">${d.b}</text>`;
+  if (d.c) s += `<text x="${(ax+bx)/2}" y="${ay+20}" font-size="14" fill="#202124" font-weight="700" text-anchor="middle">${d.c}</text>`;
+  // angle values
+  if (d.angleA) s += `<text x="${ax+8}" y="${ay-8}" font-size="12" fill="#1a73e8">${d.angleA}</text>`;
+  if (d.angleB) s += `<text x="${bx-36}" y="${by-8}" font-size="12" fill="#1a73e8">${d.angleB}</text>`;
+  if (d.angleC) s += `<text x="${cx-14}" y="${cy+18}" font-size="12" fill="#1a73e8">${d.angleC}</text>`;
+  return s + '</svg>';
+}
+
+function _svgCoordinate(d) {
+  const W=260, H=220, cx=W/2, cy=H/2, step=30;
+  let s = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:260px">`;
+  s += '<g stroke="#dadce0" stroke-width="0.5">';
+  for (let x=cx%step; x<W; x+=step) s += `<line x1="${x}" y1="0" x2="${x}" y2="${H}"/>`;
+  for (let y=cy%step; y<H; y+=step) s += `<line x1="0" y1="${y}" x2="${W}" y2="${y}"/>`;
+  s += '</g>';
+  s += `<line x1="0" y1="${cy}" x2="${W}" y2="${cy}" stroke="#202124" stroke-width="1.5" marker-end="url(#arr)"/>`;
+  s += `<line x1="${cx}" y1="${H}" x2="${cx}" y2="0" stroke="#202124" stroke-width="1.5" marker-end="url(#arr)"/>`;
+  s += `<defs><marker id="arr" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#202124"/></marker></defs>`;
+  s += `<text x="${W-10}" y="${cy-6}" font-size="12" fill="#5f6368">x</text>`;
+  s += `<text x="${cx+5}" y="12" font-size="12" fill="#5f6368">y</text>`;
+  // tick labels
+  for (let i=-4; i<=4; i++) {
+    if (i===0) continue;
+    s += `<text x="${cx+i*step-3}" y="${cy+14}" font-size="9" fill="#999">${i}</text>`;
+    s += `<text x="${cx+4}" y="${cy-i*step+3}" font-size="9" fill="#999">${i}</text>`;
+  }
+  (d.points||[]).forEach(p => {
+    const px=cx+p.x*step, py=cy-p.y*step;
+    s += `<circle cx="${px}" cy="${py}" r="4.5" fill="#1a73e8"/>`;
+    if (p.label) s += `<text x="${px+7}" y="${py-5}" font-size="12" fill="#202124" font-weight="600">${p.label}</text>`;
+  });
+  if (d.line && d.line.length===2) {
+    const [p1,p2]=d.line;
+    s += `<line x1="${cx+p1.x*step}" y1="${cy-p1.y*step}" x2="${cx+p2.x*step}" y2="${cy-p2.y*step}" stroke="#e37400" stroke-width="2"/>`;
+  }
+  return s + '</svg>';
+}
+
+function _svgCircle(d) {
+  const W=220, H=200, cx=W/2, cy=H/2, r=70;
+  let s = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:220px">`;
+  s += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#e8f0fe" stroke="#1a73e8" stroke-width="2"/>`;
+  s += `<circle cx="${cx}" cy="${cy}" r="3" fill="#1a73e8"/>`;
+  if (d.showDiameter) {
+    s += `<line x1="${cx-r}" y1="${cy}" x2="${cx+r}" y2="${cy}" stroke="#e37400" stroke-width="1.8"/>`;
+    if (d.diameter) s += `<text x="${cx}" y="${cy+18}" font-size="14" fill="#e37400" font-weight="700" text-anchor="middle">${d.diameter}</text>`;
+  }
+  if (d.radius || d.showRadius !== false) {
+    s += `<line x1="${cx}" y1="${cy}" x2="${cx+r}" y2="${cy}" stroke="#1a73e8" stroke-width="1.5" stroke-dasharray="5"/>`;
+    if (d.radius) s += `<text x="${cx+r/2}" y="${cy-8}" font-size="14" fill="#202124" font-weight="700" text-anchor="middle">${d.radius}</text>`;
+  }
+  if (d.label) s += `<text x="${cx}" y="${cy+r+18}" font-size="13" fill="#5f6368" text-anchor="middle">${d.label}</text>`;
+  return s + '</svg>';
+}
+
+// ── DIAGRAM FORM ──────────────────────────────────────────────────────────────
+function refreshDiagramForm(existing) {
+  const type = document.getElementById('qf-diagram-type')?.value || '';
+  const fields = document.getElementById('qf-diagram-fields');
+  const preview = document.getElementById('qf-diagram-preview');
+  if (!fields) return;
+  const e = existing || {};
+
+  if (!type) { fields.innerHTML = ''; preview.style.display='none'; return; }
+
+  const f = (id, label, val='') =>
+    `<div><label>${label}</label><input type="text" id="${id}" value="${val}" oninput="previewDiagram()"></div>`;
+
+  if (type === 'right_triangle') {
+    fields.innerHTML = `<div class="diag-field-grid">
+      ${f('dg-a','a (opposite)',e.a||'')} ${f('dg-b','b (adjacent)',e.b||'')} ${f('dg-c','c (hyp)',e.c||'')}
+      ${f('dg-angleA','Angle α',e.angleA||'')} ${f('dg-angleB','Angle β',e.angleB||'')}
+      <div><label>Highlight side</label><select id="dg-highlight" onchange="previewDiagram()">
+        <option value="">none</option><option value="a" ${e.highlight==='a'?'selected':''}>a</option>
+        <option value="b" ${e.highlight==='b'?'selected':''}>b</option><option value="c" ${e.highlight==='c'?'selected':''}>c</option>
+      </select></div></div>`;
+  } else if (type === 'triangle') {
+    fields.innerHTML = `<div class="diag-field-grid">
+      ${f('dg-a','Side a (BC)',e.a||'')} ${f('dg-b','Side b (AC)',e.b||'')} ${f('dg-c','Side c (AB)',e.c||'')}
+      ${f('dg-angleA','Angle A',e.angleA||'')} ${f('dg-angleB','Angle B',e.angleB||'')} ${f('dg-angleC','Angle C',e.angleC||'')}</div>`;
+  } else if (type === 'coordinate') {
+    fields.innerHTML = `<div style="font-size:.8rem;color:var(--muted);margin-bottom:.3rem">Points: format <code>x,y,Label</code> — one per line</div>
+      <textarea id="dg-points" rows="3" style="width:100%;font-family:monospace;font-size:.82rem;border:1.5px solid var(--border);border-radius:6px;padding:.4rem" oninput="previewDiagram()">${(e.points||[]).map(p=>`${p.x},${p.y},${p.label||''}`).join('\n')}</textarea>`;
+  } else if (type === 'circle') {
+    fields.innerHTML = `<div class="diag-field-grid">
+      ${f('dg-radius','Radius label',e.radius||'')} ${f('dg-diameter','Diameter label',e.diameter||'')} ${f('dg-label','Caption',e.label||'')}
+      <div><label>Show diameter</label><select id="dg-showDiam" onchange="previewDiagram()">
+        <option value="" ${!e.showDiameter?'selected':''}>No</option><option value="1" ${e.showDiameter?'selected':''}>Yes</option>
+      </select></div></div>`;
+  }
+  previewDiagram();
+}
+
+function collectDiagramForm() {
+  const type = document.getElementById('qf-diagram-type')?.value || '';
+  if (!type) return null;
+  const v = id => document.getElementById(id)?.value.trim() || '';
+  if (type === 'right_triangle') {
+    return { type, a:v('dg-a'), b:v('dg-b'), c:v('dg-c'), angleA:v('dg-angleA'), angleB:v('dg-angleB'), highlight:v('dg-highlight') };
+  } else if (type === 'triangle') {
+    return { type, a:v('dg-a'), b:v('dg-b'), c:v('dg-c'), angleA:v('dg-angleA'), angleB:v('dg-angleB'), angleC:v('dg-angleC') };
+  } else if (type === 'coordinate') {
+    const lines = (document.getElementById('dg-points')?.value||'').split('\n').map(l=>l.trim()).filter(Boolean);
+    const points = lines.map(l => { const [x,y,label]=l.split(','); return {x:parseFloat(x)||0, y:parseFloat(y)||0, label:label?.trim()||''}; });
+    return { type, points };
+  } else if (type === 'circle') {
+    return { type, radius:v('dg-radius'), diameter:v('dg-diameter'), label:v('dg-label'), showDiameter:!!document.getElementById('dg-showDiam')?.value };
+  }
+  return null;
+}
+
+function previewDiagram() {
+  const d = collectDiagramForm();
+  const preview = document.getElementById('qf-diagram-preview');
+  if (!preview) return;
+  if (!d) { preview.style.display='none'; return; }
+  const svg = renderDiagramSVG(d);
+  if (svg) { preview.style.display='block'; preview.innerHTML = svg; }
+  else preview.style.display='none';
 }
 
 function renderMC(q, container) {
@@ -3032,6 +3217,18 @@ function showAddQuestionForm(idx) {
         <textarea id="qf-explanation" placeholder="Brief explanation of the correct answer…">${existing?.explanation||''}</textarea>
       </div>
       <div class="form-row">
+        <label>Diagram (optional)</label>
+        <select id="qf-diagram-type" onchange="refreshDiagramForm()">
+          <option value="">— None —</option>
+          <option value="right_triangle" ${existing?.diagram?.type==='right_triangle'?'selected':''}>Right Triangle</option>
+          <option value="triangle" ${existing?.diagram?.type==='triangle'?'selected':''}>General Triangle</option>
+          <option value="coordinate" ${existing?.diagram?.type==='coordinate'?'selected':''}>Coordinate Plane</option>
+          <option value="circle" ${existing?.diagram?.type==='circle'?'selected':''}>Circle</option>
+        </select>
+        <div id="qf-diagram-fields" style="margin-top:.5rem"></div>
+        <div id="qf-diagram-preview" style="margin-top:.5rem;text-align:center;background:#f8f9ff;border-radius:8px;padding:.5rem;display:none"></div>
+      </div>
+      <div class="form-row">
         <label>Exercise Image (optional — attach a worked example or diagram)</label>
         <input type="file" id="qf-image" accept="image/*,.pdf" style="padding:.3rem">
         <div id="qf-image-preview" style="margin-top:.4rem"></div>
@@ -3045,6 +3242,7 @@ function showAddQuestionForm(idx) {
   form.style.display = 'block';
   document.getElementById('add-q-btn').style.display = 'none';
   renderQTypeFields(type, existing);
+  refreshDiagramForm(existing?.diagram);
 }
 
 function refreshQFormType() {
@@ -3142,6 +3340,10 @@ function saveQuestion() {
   }
   // Preserve existing image if no new file selected
   if (existing?.exerciseImage) q.exerciseImage = existing.exerciseImage;
+
+  // Diagram
+  const diagramData = collectDiagramForm();
+  if (diagramData) q.diagram = diagramData;
 
   const fileInput = document.getElementById('qf-image');
   const file = fileInput?.files?.[0];
