@@ -723,11 +723,103 @@
   .add-subject-btn:hover { border-color: var(--primary); background: #e8f0fe; }
 
   @media (max-width: 600px) {
-    header { padding: 1rem; }
-    .card { padding: 1.3rem; }
+    header {
+      padding: .75rem 1rem;
+      gap: .5rem;
+    }
+    header h1 { font-size: 1.15rem; }
+    header p { font-size: .78rem; }
+    #admin-btn, #home-btn {
+      padding: .35rem .7rem;
+      font-size: .78rem;
+    }
+    #score-bar {
+      gap: .75rem;
+      padding: .4rem .7rem;
+      font-size: .78rem;
+      flex-wrap: wrap;
+    }
+    #score-bar span { font-size: .95rem; }
+
+    main { margin: 1rem auto; padding: 0 .6rem; }
+
+    .category-grid {
+      grid-template-columns: 1fr 1fr;
+      gap: .75rem;
+    }
+    .category-card { padding: 1.2rem .9rem; }
+    .category-icon { font-size: 2.2rem; }
+    .category-card h3 { font-size: .95rem; }
+    .category-card p { font-size: .75rem; }
+
+    .topic-grid {
+      grid-template-columns: 1fr;
+      gap: .7rem;
+    }
+
+    .card { padding: 1.2rem 1rem; }
     .q-text { font-size: 1rem; }
+    .option-btn { padding: .75rem .85rem; font-size: .93rem; }
+    .option-btn .opt-letter { width: 24px; height: 24px; font-size: .78rem; }
+
+    .tf-row { gap: .6rem; }
+    .tf-btn { padding: .75rem .5rem; font-size: .93rem; }
+
+    #topic-switcher {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      padding-bottom: .3rem;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    #topic-switcher::-webkit-scrollbar { display: none; }
+    .ts-btn { flex-shrink: 0; }
+
     .big-score { font-size: 3rem; }
+    .results-breakdown { gap: 1rem; }
+    .rb-item .rb-num { font-size: 1.5rem; }
+    .results-card { padding: 1.5rem 1rem; }
+
     .form-row.row2 { grid-template-columns: 1fr; }
+
+    #admin-overlay { overflow-y: auto; }
+    .admin-header { padding: .9rem 1rem; }
+    .admin-header h2 { font-size: 1rem; }
+    .admin-body { padding: 0 .6rem; margin-top: 1rem; }
+    .admin-bar-label { width: 110px; }
+    .admin-bar-pct { width: 70px; font-size: .78rem; }
+
+    .modal-overlay { padding: .5rem; align-items: flex-start; }
+    .modal {
+      padding: 1.2rem 1rem;
+      border-radius: 12px;
+      max-height: calc(100vh - 1rem);
+      overflow-y: auto;
+    }
+    .gen-review-box {
+      padding: 1rem;
+      border-radius: 12px;
+    }
+
+    .profile-grid {
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    }
+
+    .subject-tabs { gap: .35rem; }
+    .subject-tab { padding: .35rem .8rem; font-size: .82rem; }
+
+    .tg-stats { gap: 1.2rem; }
+    .tg-stat .tg-num { font-size: 1.3rem; }
+
+    .admin-topic-toggle-grid { gap: .35rem; }
+    .admin-topic-toggle { padding: .35rem .65rem; font-size: .82rem; }
+
+    .next-btn, .restart-btn, #start-btn {
+      padding: .75rem 1.5rem;
+      font-size: .95rem;
+    }
+
+    .walkthrough ol li { font-size: .88rem; }
   }
 
   /* Profile screen */
