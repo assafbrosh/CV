@@ -4030,6 +4030,23 @@ async function pushDataToGitHub() {
   }
 }
 
+async function fetchGistContent(gistId, token) {
+  const headers = { Accept: 'application/vnd.github.v3+json' };
+  if (token) headers.Authorization = `token ${token}`;
+  const res = await fetch(`https://api.github.com/gists/${gistId}`, { headers });
+  if (!res.ok) throw new Error('Could not fetch gist.');
+  const j = await res.json();
+  const fileInfo = j.files?.[GIST_FILENAME];
+  if (!fileInfo) throw new Error('No data file in gist.');
+  // If truncated, fetch from raw_url for full content
+  if (fileInfo.truncated && fileInfo.raw_url) {
+    const rawRes = await fetch(fileInfo.raw_url, token ? { headers: { Authorization: `token ${token}` } } : {});
+    if (!rawRes.ok) throw new Error('Could not fetch full gist content.');
+    return { text: await rawRes.text(), gistMeta: j };
+  }
+  return { text: fileInfo.content, gistMeta: j };
+}
+
 async function findGistByFilename(token) {
   let page = 1;
   while (page <= 5) {
@@ -4067,14 +4084,8 @@ async function pullDataFromGitHub(silent) {
   }
   if (status && !silent) status.innerHTML = '⏳ Loading from cloud…';
   try {
-    const res = await fetch(`https://api.github.com/gists/${gistId}`, {
-      headers: { Accept: 'application/vnd.github.v3+json' }
-    });
-    if (!res.ok) throw new Error('Could not fetch gist.');
-    const j = await res.json();
-    const raw = j.files?.[GIST_FILENAME]?.content;
-    if (!raw) throw new Error('No data file in gist.');
-    const parsed = JSON.parse(raw);
+    const { text } = await fetchGistContent(gistId, token);
+    const parsed = JSON.parse(text);
     const data = parsed.data || parsed;
     let count = 0;
     Object.entries(data).forEach(([k, v]) => {
@@ -4098,14 +4109,8 @@ async function autoSyncOnStartup() {
   }
   if (!gistId) return;
   try {
-    const headers = { Accept: 'application/vnd.github.v3+json' };
-    if (token) headers.Authorization = `token ${token}`;
-    const res = await fetch(`https://api.github.com/gists/${gistId}`, { headers });
-    if (!res.ok) return;
-    const j = await res.json();
-    const raw = j.files?.[GIST_FILENAME]?.content;
-    if (!raw) return;
-    const parsed = JSON.parse(raw);
+    const { text } = await fetchGistContent(gistId, token);
+    const parsed = JSON.parse(text);
     const remoteTs = parsed.exportedAt || 0;
     const localTs = parseInt(localStorage.getItem('physPrepLastPush') || '0');
     if (remoteTs <= localTs) return;
