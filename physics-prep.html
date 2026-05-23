@@ -3945,7 +3945,54 @@ function renderAdminAISettings() {
       <div class="ai-key-status ${hasKey ? 'set' : 'unset'}" id="ai-key-status">
         ${hasKey ? `✓ ${providerName} key is set — AI generation is enabled` : `⚠ No ${providerName} key — AI generation will not work`}
       </div>
+      ${hasKey ? `<button class="admin-gen-btn" style="margin-top:.6rem" onclick="testAIConnection()">🔌 Test Connection</button>
+      <div id="ai-test-result" style="font-size:.82rem;margin-top:.4rem"></div>` : ''}
     </div>`;
+}
+
+async function testAIConnection() {
+  const provider = getAIProvider();
+  const storageKey = provider === 'openai' ? 'physPrepAIKey' : 'physPrepAIKeyAnthropic';
+  const apiKey = (localStorage.getItem(storageKey) || '').trim();
+  const el = document.getElementById('ai-test-result');
+  if (!el) return;
+  el.innerHTML = '⏳ Testing…';
+  try {
+    let res;
+    if (provider === 'anthropic') {
+      res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 10,
+          messages: [{ role: 'user', content: 'Say "ok"' }],
+        }),
+      });
+    } else {
+      res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini', max_tokens: 5,
+          messages: [{ role: 'user', content: 'Say "ok"' }],
+        }),
+      });
+    }
+    if (res.ok) {
+      el.innerHTML = '<span style="color:var(--success)">✅ Connection works! AI generation is ready.</span>';
+    } else {
+      const j = await res.json().catch(() => ({}));
+      el.innerHTML = `<span style="color:var(--danger)">❌ HTTP ${res.status}: ${j?.error?.message || JSON.stringify(j)}</span>`;
+    }
+  } catch(e) {
+    el.innerHTML = `<span style="color:var(--danger)">❌ ${e.message} — check your internet or try a different network.</span>`;
+  }
 }
 
 function switchAIProvider(provider) {
