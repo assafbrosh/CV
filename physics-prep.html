@@ -2827,6 +2827,9 @@ function _sqRecordAnswer(q, idx, correct, hits) {
   // Update progress bar
   _sqUpdateProgress();
   updateHeader();
+
+  // Auto-push to cloud (debounced — fires 8s after last answer)
+  _scheduleAutoSync();
 }
 
 function _sqShowFeedback(q, idx, correct, hits) {
@@ -4258,6 +4261,63 @@ function closeAdminPanel() {
       buildCategoryGrid();
     }
   }
+}
+
+// ── AUTO SYNC ────────────────────────────────────────────────────────────────
+let _autoSyncTimer = null;
+function _scheduleAutoSync() {
+  if (!getGitHubToken()) return;
+  clearTimeout(_autoSyncTimer);
+  _autoSyncTimer = setTimeout(_silentPush, 8000);
+}
+
+async function _silentPush() {
+  const token = getGitHubToken();
+  if (!token) return;
+  try {
+    const content = JSON.stringify(collectAllData({ forCloud: true }), null, 2);
+    if (new Blob([content]).size > 8 * 1024 * 1024) return;
+    const payload = { files: { [GIST_FILENAME]: { content } } };
+    const gistId = getGistId();
+    let res;
+    if (gistId) {
+      res = await fetch(`https://api.github.com/gists/${gistId}`, {
+        method: 'PATCH',
+        headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    } else {
+      payload.description = 'Science Exam Prep data';
+      payload.public = false;
+      res = await fetch('https://api.github.com/gists', {
+        method: 'POST',
+        headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    }
+    if (res.ok) {
+      const j = await res.json();
+      if (j.id) localStorage.setItem('physPrepGistId', j.id);
+      localStorage.setItem('physPrepLastPush', Date.now().toString());
+      // Show subtle sync indicator
+      _showSyncBadge('✅ Synced');
+    }
+  } catch(e) { /* silent — user can manually push if needed */ }
+}
+
+function _showSyncBadge(msg) {
+  let badge = document.getElementById('sync-badge');
+  if (!badge) {
+    badge = document.createElement('span');
+    badge.id = 'sync-badge';
+    badge.style.cssText = 'font-size:.75rem;color:rgba(255,255,255,.75);margin-left:.5rem;transition:opacity .5s';
+    const h = document.querySelector('header');
+    if (h) h.appendChild(badge);
+  }
+  badge.textContent = msg;
+  badge.style.opacity = '1';
+  clearTimeout(badge._t);
+  badge._t = setTimeout(() => { badge.style.opacity = '0'; }, 3000);
 }
 
 // ── CLOUD SYNC (GITHUB GIST) ──────────────────────────────────────────────────
