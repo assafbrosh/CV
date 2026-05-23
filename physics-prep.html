@@ -2336,6 +2336,7 @@ function saveCustomTopics() {
   // Save AI-generated / admin-added questions for built-in topics separately
   const extra = QBANK.filter(q => q._aiGenerated || q._adminAdded);
   localStorage.setItem('physPrepExtraQuestions', JSON.stringify(extra));
+  _scheduleAutoSync();
 }
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
@@ -4299,10 +4300,14 @@ async function _silentPush() {
       const j = await res.json();
       if (j.id) localStorage.setItem('physPrepGistId', j.id);
       localStorage.setItem('physPrepLastPush', Date.now().toString());
-      // Show subtle sync indicator
-      _showSyncBadge('✅ Synced');
+      _showSyncBadge('☁️ Synced');
+    } else {
+      const err = await res.json().catch(() => ({}));
+      _showSyncBadge(`⚠️ Sync failed: ${err.message || res.status}`);
     }
-  } catch(e) { /* silent — user can manually push if needed */ }
+  } catch(e) {
+    _showSyncBadge(`⚠️ Sync failed: ${e.message}`);
+  }
 }
 
 function _showSyncBadge(msg) {
@@ -4316,8 +4321,9 @@ function _showSyncBadge(msg) {
   }
   badge.textContent = msg;
   badge.style.opacity = '1';
+  badge.style.color = msg.startsWith('⚠') ? '#ffcc80' : 'rgba(255,255,255,.85)';
   clearTimeout(badge._t);
-  badge._t = setTimeout(() => { badge.style.opacity = '0'; }, 3000);
+  badge._t = setTimeout(() => { badge.style.opacity = '0'; }, msg.startsWith('⚠') ? 8000 : 3000);
 }
 
 // ── CLOUD SYNC (GITHUB GIST) ──────────────────────────────────────────────────
@@ -4696,6 +4702,7 @@ function deleteTopic(topicId) {
 function saveCustomSubjects() {
   const custom = SUBJECTS.filter(s => s._custom);
   localStorage.setItem('physPrepCustomSubjects', JSON.stringify(custom));
+  _scheduleAutoSync();
 }
 function loadCustomSubjects() {
   try {
