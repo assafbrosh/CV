@@ -4493,9 +4493,11 @@ function renderGHTokenStatus() {
   if (!el) return;
   const t = getGitHubToken();
   const g = getGistId();
-  if (t && g) { el.className = 'ai-key-status set'; el.textContent = `✅ Token saved · Gist: ${g.slice(0,8)}…`; }
-  else if (t)  { el.className = 'ai-key-status set'; el.textContent = '✅ Token saved (push once to create gist)'; }
-  else         { el.className = 'ai-key-status unset'; el.textContent = 'No token set'; }
+  const lastPush = parseInt(localStorage.getItem('physPrepLastPush') || '0');
+  const lastPushStr = lastPush ? new Date(lastPush).toLocaleString() : 'never';
+  if (t && g) { el.className = 'ai-key-status set'; el.innerHTML = `✅ Token saved · Gist: ${g.slice(0,8)}… · Last sync: ${lastPushStr}`; }
+  else if (t)  { el.className = 'ai-key-status set'; el.textContent = '✅ Token saved — click "Push to Cloud" to create your sync gist'; }
+  else         { el.className = 'ai-key-status unset'; el.textContent = '⚠ No token set — enter your GitHub token to enable cross-device sync'; }
 }
 
 function collectAllData({ forCloud = false } = {}) {
@@ -4635,7 +4637,8 @@ async function pullDataFromGitHub(silent) {
 async function autoSyncOnStartup() {
   let gistId = getGistId();
   const token = getGitHubToken();
-  if (!gistId && token) {
+  if (!token) return;
+  if (!gistId) {
     gistId = await findGistByFilename(token).catch(() => null);
     if (gistId) localStorage.setItem('physPrepGistId', gistId);
   }
@@ -4645,7 +4648,11 @@ async function autoSyncOnStartup() {
     const parsed = JSON.parse(text);
     const remoteTs = parsed.exportedAt || 0;
     const localTs = parseInt(localStorage.getItem('physPrepLastPush') || '0');
-    if (remoteTs <= localTs) return;
+    if (remoteTs <= localTs) {
+      _showSyncBadge('☁️ Up to date');
+      return;
+    }
+    _showSyncBadge('☁️ Syncing…');
     const data = parsed.data || parsed;
     let count = 0;
     Object.entries(data).forEach(([k, v]) => {
@@ -4653,8 +4660,13 @@ async function autoSyncOnStartup() {
     });
     // Mark local as up-to-date so we don't reload on next visit
     localStorage.setItem('physPrepLastPush', remoteTs.toString());
-    if (count > 0) location.reload();
-  } catch(e) { /* silent */ }
+    if (count > 0) {
+      _showSyncBadge(`☁️ Synced ${count} items`);
+      setTimeout(() => location.reload(), 600);
+    }
+  } catch(e) {
+    _showSyncBadge(`⚠️ Sync error: ${e.message}`);
+  }
 }
 
 function downloadAllData() {
@@ -4966,7 +4978,8 @@ function renderAdminBenchmarks(topicId) {
       <button class="admin-gen-btn" id="gen-btn-${topicId}" onclick="generateQuestionsFromBenchmarks('${topicId}')">
         🤖 From Benchmarks
       </button>
-    </div>`;
+    </div>
+    <div id="gen-bench-status-${topicId}" style="font-size:.8rem;margin-top:.3rem"></div>`;
 
   if (existingQs.length >= 1) {
     html += `
@@ -5127,10 +5140,13 @@ let _genTopicId   = null;
 let _genQuestions = [];
 
 async function generateQuestionsFromBenchmarks(topicId) {
+  const statusEl = document.getElementById(`gen-bench-status-${topicId}`);
+  const setStatus = (msg, color='var(--muted)') => { if (statusEl) statusEl.innerHTML = `<span style="color:${color}">${msg}</span>`; };
+
   const benchmarks = getBenchmarks(topicId);
   const hasUsable = benchmarks.some(b => _isImage(b) || _isPDF(b));
   if (!hasUsable) {
-    alert('Please upload at least one benchmark file (PDF, JPG, or PNG) for this subject before generating questions.');
+    setStatus('❌ Upload at least one benchmark file (PDF, JPG, or PNG) first.', 'var(--danger)');
     return;
   }
 
@@ -5139,13 +5155,13 @@ async function generateQuestionsFromBenchmarks(topicId) {
   const apiKey     = (localStorage.getItem(storageKey) || '').trim();
   if (!apiKey) {
     const name = provider === 'openai' ? 'OpenAI' : 'Anthropic';
-    alert(`Please set your ${name} API key in the AI Settings section of the Admin Panel before generating questions.`);
+    setStatus(`❌ No ${name} API key set — add it in AI Settings above.`, 'var(--danger)');
     return;
   }
 
   const topic = TOPICS.find(t => t.id === topicId);
   const btn   = document.getElementById(`gen-btn-${topicId}`);
-  const setBtnText = t => { if (btn) { btn.textContent = t; btn.disabled = t !== '🤖 Generate Questions with AI'; } };
+  const setBtnText = t => { if (btn) { btn.textContent = t; btn.disabled = t.startsWith('⏳'); } };
   setBtnText('⏳ Preparing…');
 
   // Collect image payloads from all benchmarks (images directly, PDFs rendered via PDF.js)
@@ -5175,14 +5191,15 @@ async function generateQuestionsFromBenchmarks(topicId) {
 
   if (!imagePayloads.length) {
     const detail = pdfErrors.length
-      ? `PDF rendering failed for: ${pdfErrors.join(', ')}.\n\nTry re-uploading the PDF, or upload a JPG/PNG screenshot of the exercises instead.`
+      ? `PDF rendering failed for: ${pdfErrors.join(', ')}. Try re-uploading or use a JPG/PNG screenshot instead.`
       : 'No readable content could be extracted. Try uploading a JPG or PNG image.';
-    alert(`Could not prepare benchmark content.\n\n${detail}`);
-    setBtnText('🤖 Generate Questions with AI');
+    setStatus(`❌ ${detail}`, 'var(--danger)');
+    setBtnText('🤖 From Benchmarks');
     return;
   }
 
   setBtnText('⏳ Generating…');
+  setStatus('⏳ Contacting AI, please wait…');
 
   const difficulty = state.profileId ? getDifficulty(state.profileId, topicId) : 'medium';
   const diffInstruction = { easy: 'simple recall and basic application', medium: 'moderate reasoning and multi-step problems', hard: 'challenging analysis and complex calculations' }[difficulty] || 'moderate difficulty';
@@ -5260,10 +5277,13 @@ The "answer" field is the 0-based index of the correct option.`;
     if (!match) throw new Error('No JSON array found in response. Try again.');
     const generated = JSON.parse(match[0]);
     if (!Array.isArray(generated) || !generated.length) throw new Error('Empty question list returned.');
+    setStatus('');
     showGenReviewModal(topicId, generated);
 
   } catch(e) {
-    alert(`Generation failed: ${e.message}`);
+    const isFetch = e.message.toLowerCase().includes('fetch') || e.message.toLowerCase().includes('network');
+    const hint = isFetch ? ' — check your internet connection or try the 🔌 Test Connection button in AI Settings' : '';
+    setStatus(`❌ ${e.message}${hint}`, 'var(--danger)');
   } finally {
     setBtnText('🤖 From Benchmarks');
   }
@@ -5402,8 +5422,9 @@ For "sa": "answer" is the full model answer, "keywords" are 2-4 key concepts the
     showGenReviewModal(topicId, generated);
 
   } catch(e) {
-    setStatus(`❌ ${e.message}`, 'var(--danger)');
-    console.error('generateQuestionsFromExamples error:', e);
+    const isFetch = e.message.toLowerCase().includes('fetch') || e.message.toLowerCase().includes('network');
+    const hint = isFetch ? ' — check your internet or try 🔌 Test Connection in AI Settings' : '';
+    setStatus(`❌ ${e.message}${hint}`, 'var(--danger)');
   } finally {
     setBtn('✨ Generate from Examples');
   }
