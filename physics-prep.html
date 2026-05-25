@@ -2862,8 +2862,106 @@ function _sqUpdateProgress() {
   const total = state.queue.length;
   const el = document.getElementById('sq-progress-text');
   if (el) el.innerHTML = `<strong>${done}</strong> / ${total} answered`;
-  // Update score bar
   updateHeader();
+  if (done === total && total > 0 && !state._autoGenRunning) {
+    _autoGenerateMoreQuestions();
+  }
+}
+
+async function _autoGenerateMoreQuestions() {
+  const provider = getAIProvider();
+  const storageKey = provider === 'openai' ? 'physPrepAIKey' : 'physPrepAIKeyAnthropic';
+  const apiKey = (localStorage.getItem(storageKey) || '').trim();
+  if (!apiKey) return; // No AI key — skip silently
+  state._autoGenRunning = true;
+
+  // Show loading card
+  const area = document.getElementById('question-area');
+  const loader = document.createElement('div');
+  loader.id = 'sq-autogen-loader';
+  loader.className = 'card';
+  loader.style.cssText = 'text-align:center;color:var(--muted);padding:1.5rem;';
+  loader.innerHTML = '✨ Generating more questions…';
+  area.appendChild(loader);
+
+  const topics = state.selectedTopics || [];
+  const newQuestions = [];
+
+  for (const topicId of topics) {
+    const topic = TOPICS.find(t => t.id === topicId);
+    const existingQs = QBANK.filter(q => q.topic === topicId);
+    if (!existingQs.length) continue;
+    const samples = existingQs.slice(0, 3).map(q => ({ question: q.question, type: q.type||'mc', options: q.options||[], answer: q.answer }));
+    const difficulty = getDifficulty(state.profileId, topicId);
+    const diffInstruction = { easy:'simple recall (Year 7–8)', medium:'moderate reasoning (Year 9)', hard:'challenging analysis (Year 10–11)' }[difficulty] || 'moderate';
+
+    const prompt = `You are a teacher. Generate 8 NEW questions about "${topic?.label || topicId}" at ${diffInstruction} difficulty.
+Include 5 multiple-choice and 3 short written-answer questions. Do NOT repeat these examples:
+${JSON.stringify(samples)}
+
+Return ONLY a valid JSON array:
+[{"type":"mc","question":"...","options":["A","B","C","D"],"answer":0,"explanation":"..."},
+ {"type":"sa","question":"...","answer":"model answer","keywords":["k1","k2"],"explanation":"..."}]`;
+
+    try {
+      let text;
+      if (provider === 'anthropic') {
+        const r = await fetch('https://api.anthropic.com/v1/messages', {
+          method:'POST',
+          headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+          body: JSON.stringify({ model:'claude-haiku-4-5-20251001', max_tokens:2000, messages:[{role:'user',content:prompt}] })
+        });
+        if (!r.ok) continue;
+        const j = await r.json(); text = j.content?.[0]?.text || '';
+      } else {
+        const r = await fetch('https://api.openai.com/v1/chat/completions', {
+          method:'POST',
+          headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`},
+          body: JSON.stringify({ model:'gpt-4o-mini', max_tokens:2000, temperature:0.8, messages:[{role:'system',content:'Return only valid JSON arrays.'},{role:'user',content:prompt}] })
+        });
+        if (!r.ok) continue;
+        const j = await r.json(); text = j.choices?.[0]?.message?.content || '';
+      }
+      const match = text.match(/\[[\s\S]*\]/);
+      if (!match) continue;
+      const generated = JSON.parse(match[0]);
+      generated.forEach(q => {
+        const qType = q.type === 'sa' ? 'sa' : 'mc';
+        const newQ = {
+          id: 'autogen_' + topicId + '_' + Date.now() + '_' + Math.random().toString(36).slice(2,5),
+          topic: topicId, type: qType, _aiGenerated: true,
+          question: q.question, explanation: q.explanation || ''
+        };
+        if (qType === 'mc') { newQ.options = q.options; newQ.answer = q.answer; newQ.walkthrough = q.walkthrough||[]; }
+        else { newQ.answer = q.answer; newQ.keywords = q.keywords||[]; }
+        QBANK.push(newQ);
+        newQuestions.push(newQ);
+      });
+    } catch(e) { /* skip topic on error */ }
+  }
+
+  // Remove loader
+  loader.remove();
+  state._autoGenRunning = false;
+
+  if (!newQuestions.length) return;
+  saveCustomTopics();
+
+  // Append new cards to scroll view
+  const startIdx = state.queue.length;
+  state.queue.push(...newQuestions);
+  newQuestions.forEach((q, i) => {
+    area.appendChild(_buildScrollCard(q, startIdx + i));
+  });
+
+  // Update progress bar total
+  const el = document.getElementById('sq-progress-text');
+  const done = Object.keys(state.scrollAnswered).length;
+  if (el) el.innerHTML = `<strong>${done}</strong> / ${state.queue.length} answered`;
+
+  // Scroll to first new question
+  const firstNew = document.getElementById(`sqcard-${startIdx}`);
+  if (firstNew) firstNew.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function scrollToNextUnanswered() {
@@ -5227,25 +5325,34 @@ Here are ${samples.length} example question(s) already in this topic (use them t
 
 ${JSON.stringify(samples, null, 2)}
 
-Generate 8 NEW multiple-choice questions at ${diffInstruction}. The new questions must:
+Generate 10 NEW questions at ${diffInstruction}. The new questions must:
 - Cover the same subject matter but be clearly different from the examples above
 - Match the difficulty level specified (${difficulty})
-- Be varied (different question styles, different concepts within the topic)${diagramInstructions}
+- Be varied: include 6 multiple-choice AND 4 short written-answer questions${diagramInstructions}
 
 Return ONLY a valid JSON array — no markdown, no explanation, just the array:
 
 [
   {
+    "type": "mc",
     "question": "Question text",
     "options": ["Option A","Option B","Option C","Option D"],
     "answer": 0,
     "explanation": "Why the correct answer is right",
-    "walkthrough": ["Step 1","Step 2","Step 3"],
+    "walkthrough": ["Step 1","Step 2"],
     "diagram": null
+  },
+  {
+    "type": "sa",
+    "question": "Written question text",
+    "answer": "Full model answer here",
+    "keywords": ["key1", "key2", "key3"],
+    "explanation": "Why this answer is correct"
   }
 ]
 
-The "answer" field is the 0-based index of the correct option. Set "diagram" to null if no shape is needed.`;
+For "mc": "answer" is the 0-based index of the correct option. Set "diagram" to null if no shape is needed.
+For "sa": "answer" is the full model answer, "keywords" are 2-4 key concepts the student must mention.`;
 
   try {
     let responseText;
@@ -5314,11 +5421,16 @@ function showGenReviewModal(topicId, questions) {
     div.className = 'gen-q-item selected';
     div.dataset.idx = i;
     const diagSvg = (q.diagram?.type) ? `<div style="margin:.4rem 0;text-align:center;background:#f8f9ff;border-radius:8px;padding:.4rem">${renderDiagramSVG(q.diagram)}</div>` : '';
+    const isSA = q.type === 'sa';
     div.innerHTML = `
-      <div class="gq-question">${i+1}. ${q.question}</div>
+      <div class="gq-question">${i+1}. ${isSA ? '✏️ ' : ''}${q.question}</div>
       ${diagSvg}
-      <div class="gq-options">${(q.options||[]).map((o,oi) => `${['A','B','C','D'][oi]}. ${o}`).join(' &nbsp;·&nbsp; ')}</div>
-      <div class="gq-correct">✓ ${(q.options||[])[q.answer] || ''}</div>`;
+      ${isSA
+        ? `<div class="gq-options" style="font-style:italic">Written answer — model: ${q.answer}</div>
+           <div class="gq-correct">Keywords: ${(q.keywords||[]).join(', ')}</div>`
+        : `<div class="gq-options">${(q.options||[]).map((o,oi) => `${['A','B','C','D'][oi]}. ${o}`).join(' &nbsp;·&nbsp; ')}</div>
+           <div class="gq-correct">✓ ${(q.options||[])[q.answer] || ''}</div>`
+      }`;
     div.addEventListener('click', () => div.classList.toggle('selected'));
     list.appendChild(div);
   });
@@ -5338,13 +5450,19 @@ function saveGeneratedQuestions() {
   selected.forEach(el => {
     const q = _genQuestions[parseInt(el.dataset.idx)];
     if (!q) return;
+    const qType = q.type === 'sa' ? 'sa' : 'mc';
     const newQ = {
       id: 'gen_' + topicId + '_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
-      topic: topicId, type: 'mc', _aiGenerated: true,
-      question: q.question, options: q.options, answer: q.answer,
-      explanation: q.explanation || '', walkthrough: q.walkthrough || [],
+      topic: topicId, type: qType, _aiGenerated: true,
+      question: q.question, explanation: q.explanation || '',
     };
-    if (q.diagram && q.diagram.type) newQ.diagram = q.diagram;
+    if (qType === 'mc') {
+      newQ.options = q.options; newQ.answer = q.answer;
+      newQ.walkthrough = q.walkthrough || [];
+      if (q.diagram?.type) newQ.diagram = q.diagram;
+    } else {
+      newQ.answer = q.answer; newQ.keywords = q.keywords || [];
+    }
     QBANK.push(newQ);
     added++;
   });
