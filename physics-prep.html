@@ -4040,16 +4040,20 @@ function renderAdminAISettings() {
         </button>
       </div>
       <p>Enter your <strong>${providerName} API key</strong>. It is stored only in your browser and sent only to ${providerName}'s API.</p>
+      ${hasKey ? `<div style="font-size:.8rem;color:var(--muted);margin-bottom:.4rem;background:#f3f4f6;padding:.35rem .6rem;border-radius:6px;font-family:monospace">
+        Saved key: ${keyVal.slice(0,14)}…${keyVal.slice(-4)} &nbsp;
+        <button onclick="clearAIKey()" style="font-size:.75rem;background:none;border:none;color:var(--danger);cursor:pointer;text-decoration:underline">Clear & re-enter</button>
+      </div>` : ''}
       <div class="ai-key-row">
-        <input class="ai-key-input" id="ai-key-input" type="password"
-          placeholder="${placeholder}" value="${keyVal}">
+        <input class="ai-key-input" id="ai-key-input" type="text"
+          placeholder="Paste new ${placeholder} key here" value="">
         <button class="ai-key-save-btn" onclick="saveAIKey()">Save</button>
       </div>
       <div class="ai-key-status ${hasKey ? 'set' : 'unset'}" id="ai-key-status">
-        ${hasKey ? `✓ ${providerName} key is set — AI generation is enabled` : `⚠ No ${providerName} key — AI generation will not work`}
+        ${hasKey ? `✓ ${providerName} key saved` : `⚠ No ${providerName} key — AI generation will not work`}
       </div>
-      ${hasKey ? `<button class="admin-gen-btn" style="margin-top:.6rem" onclick="testAIConnection()">🔌 Test Connection</button>
-      <div id="ai-test-result" style="font-size:.82rem;margin-top:.4rem"></div>` : ''}
+      <button class="admin-gen-btn" style="margin-top:.6rem" onclick="testAIConnection()">🔌 Test Connection</button>
+      <div id="ai-test-result" style="font-size:.82rem;margin-top:.4rem"></div>
     </div>`;
 }
 
@@ -4145,15 +4149,21 @@ function saveAIKey() {
   const storageKey = provider === 'openai' ? 'physPrepAIKey' : 'physPrepAIKeyAnthropic';
   const name      = provider === 'openai' ? 'OpenAI' : 'Anthropic';
   const val       = document.getElementById('ai-key-input')?.value.trim();
-  if (val) {
-    localStorage.setItem(storageKey, val);
-    document.getElementById('ai-key-status').className = 'ai-key-status set';
-    document.getElementById('ai-key-status').textContent = `✓ ${name} key saved — AI generation is enabled`;
-  } else {
-    localStorage.removeItem(storageKey);
-    document.getElementById('ai-key-status').className = 'ai-key-status unset';
-    document.getElementById('ai-key-status').textContent = `⚠ ${name} key removed`;
+  const statusEl  = document.getElementById('ai-key-status');
+  if (!val) {
+    if (statusEl) { statusEl.className = 'ai-key-status unset'; statusEl.textContent = '⚠ Nothing entered — key unchanged'; }
+    return;
   }
+  localStorage.setItem(storageKey, val);
+  if (statusEl) { statusEl.className = 'ai-key-status set'; statusEl.textContent = `✓ ${name} key saved (${val.slice(0,10)}…)`; }
+  renderAdminAISettings(); // refresh to show new prefix display
+}
+
+function clearAIKey() {
+  const provider  = getAIProvider();
+  const storageKey = provider === 'openai' ? 'physPrepAIKey' : 'physPrepAIKeyAnthropic';
+  localStorage.removeItem(storageKey);
+  renderAdminAISettings();
 }
 
 function renderAdminProfileTabs(activeId) {
