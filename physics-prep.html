@@ -2891,7 +2891,7 @@ async function _autoGenerateMoreQuestions() {
     const topic = TOPICS.find(t => t.id === topicId);
     const existingQs = QBANK.filter(q => q.topic === topicId);
     if (!existingQs.length) continue;
-    const samples = existingQs.slice(0, 3).map(q => ({ question: q.question, type: q.type||'mc', options: q.options||[], answer: q.answer }));
+    const samples = existingQs.slice(0, 3).map(q => { const s = { question: q.question, type: q.type||'mc', options: q.options||[], answer: q.answer }; if (q.diagram?.type) s.diagram = q.diagram; return s; });
     const difficulty = getDifficulty(state.profileId, topicId);
     const diffInstruction = { easy:'simple recall (Year 7–8)', medium:'moderate reasoning (Year 9)', hard:'challenging analysis (Year 10–11)' }[difficulty] || 'moderate';
 
@@ -2899,9 +2899,14 @@ async function _autoGenerateMoreQuestions() {
 Include 5 multiple-choice and 3 short written-answer questions. Do NOT repeat these examples:
 ${JSON.stringify(samples)}
 
+If a question involves a shape or measurement, add a "diagram" field:
+  Right triangle: {"type":"right_triangle","a":"label","b":"label","c":"hypotenuse label","angleA":"label or ?","angleB":"label or ?"}
+  Circle: {"type":"circle","radius":"r label","showDiameter":false}
+  Use "?" for the unknown. Use null if no shape needed.
+
 Return ONLY a valid JSON array:
-[{"type":"mc","question":"...","options":["A","B","C","D"],"answer":0,"explanation":"..."},
- {"type":"sa","question":"...","answer":"model answer","keywords":["k1","k2"],"explanation":"..."}]`;
+[{"type":"mc","question":"...","options":["A","B","C","D"],"answer":0,"explanation":"...","diagram":null},
+ {"type":"sa","question":"...","answer":"model answer","keywords":["k1","k2"],"explanation":"...","diagram":null}]`;
 
     try {
       let text;
@@ -5373,24 +5378,20 @@ async function generateQuestionsFromExamples(topicId) {
   setBtn('⏳ Generating…');
   setStatus('⏳ Contacting AI, please wait…');
 
-  // Build few-shot examples from existing questions (up to 5 to keep prompt concise)
-  const samples = existingQs.slice(0, 5).map(q => ({
-    question: q.question,
-    options:  q.options || [],
-    answer:   q.answer,
-    explanation: q.explanation || '',
-  }));
+  // Build few-shot examples — include diagram field so AI sees existing format
+  const samples = existingQs.slice(0, 5).map(q => {
+    const s = { question: q.question, type: q.type || 'mc', options: q.options || [], answer: q.answer, explanation: q.explanation || '' };
+    if (q.diagram?.type) s.diagram = q.diagram;
+    return s;
+  });
 
-  // Detect if topic benefits from geometric diagrams
-  const topicText = ((topic?.label || '') + ' ' + (topic?.desc || '') + ' ' + topicId).toLowerCase();
-  const needsDiagram = /trig|triangle|pythag|geometry|angle|sin|cos|tan|circle|shape|area|perimeter|coordin|graph|vector|bearing/.test(topicText);
-
-  const diagramInstructions = needsDiagram ? `
-- For questions involving triangles, include a "diagram" field with this exact structure:
-  For a right triangle: {"type":"right_triangle","a":"opposite side label or value","b":"adjacent label","c":"hypotenuse label","angleA":"angle at A or ?","angleB":"angle at B"}
-  For a general triangle: {"type":"triangle","a":"side a","b":"side b","c":"side c","angleA":"angle A","angleB":"angle B","angleC":"angle C"}
-  For a circle: {"type":"circle","radius":"r label","diameter":"d label","showDiameter":true/false}
-  Use "?" for the unknown value the student must find. Omit "diagram" if the question does not need a shape.` : '';
+  // Always include diagram instructions — the AI decides when a shape is helpful
+  const diagramInstructions = `
+- If a question involves a shape, measurement or spatial relationship, add a "diagram" field using ONE of these exact structures:
+  Right triangle: {"type":"right_triangle","a":"label or value","b":"label or value","c":"hypotenuse label","angleA":"angle label or ?","angleB":"angle label or ?","highlight":"a|b|c"}
+  General triangle: {"type":"triangle","a":"side a","b":"side b","c":"side c","angleA":"angle A","angleB":"angle B","angleC":"angle C"}
+  Circle: {"type":"circle","radius":"r label","diameter":"d label","showDiameter":true}
+  Use "?" for the unknown the student must find. Set "diagram":null if no shape is needed.`;
 
   const promptText = `You are a teacher creating quiz questions for Year 9 students about "${topic?.label || topicId}"${topic?.theory ? `. The topic covers: ${topic.theory.replace(/<[^>]+>/g,' ').trim()}` : ''}.
 
@@ -5412,7 +5413,14 @@ Return ONLY a valid JSON array — no markdown, no explanation, just the array:
     "options": ["Option A","Option B","Option C","Option D"],
     "answer": 0,
     "explanation": "Why the correct answer is right",
-    "walkthrough": ["Step 1","Step 2"],
+    "diagram": {"type":"right_triangle","a":"3 cm","b":"4 cm","c":"?","angleA":"","angleB":""}
+  },
+  {
+    "type": "mc",
+    "question": "Another question with no diagram",
+    "options": ["Option A","Option B","Option C","Option D"],
+    "answer": 1,
+    "explanation": "Why the correct answer is right",
     "diagram": null
   },
   {
@@ -5420,12 +5428,14 @@ Return ONLY a valid JSON array — no markdown, no explanation, just the array:
     "question": "Written question text",
     "answer": "Full model answer here",
     "keywords": ["key1", "key2", "key3"],
-    "explanation": "Why this answer is correct"
+    "explanation": "Why this answer is correct",
+    "diagram": null
   }
 ]
 
-For "mc": "answer" is the 0-based index of the correct option. Set "diagram" to null if no shape is needed.
-For "sa": "answer" is the full model answer, "keywords" are 2-4 key concepts the student must mention.`;
+For "mc": "answer" is the 0-based index of the correct option.
+For "sa": "answer" is the full model answer, "keywords" are 2-4 key concepts the student must mention.
+Add "diagram" whenever a shape would help — use null when not needed.`;
 
   try {
     let responseText;
