@@ -4041,13 +4041,13 @@ function renderAdminAISettings() {
       </div>
       <p>Enter your <strong>${providerName} API key</strong>. It is stored only in your browser and sent only to ${providerName}'s API.</p>
       ${hasKey ? `<div style="font-size:.8rem;color:var(--muted);margin-bottom:.4rem;background:#f3f4f6;padding:.35rem .6rem;border-radius:6px;font-family:monospace">
-        Saved key: ${keyVal.slice(0,14)}…${keyVal.slice(-4)} &nbsp;
-        <button onclick="clearAIKey()" style="font-size:.75rem;background:none;border:none;color:var(--danger);cursor:pointer;text-decoration:underline">Clear & re-enter</button>
-      </div>` : ''}
+        Saved: ${keyVal.slice(0,14)}…${keyVal.slice(-4)}
+      </div>` : `<div style="font-size:.8rem;color:var(--danger);margin-bottom:.4rem">⚠ No key saved for ${providerName}</div>`}
       <div class="ai-key-row">
         <input class="ai-key-input" id="ai-key-input" type="text"
-          placeholder="Paste new ${placeholder} key here" value="">
+          placeholder="Paste ${placeholder} key here" value="">
         <button class="ai-key-save-btn" onclick="saveAIKey()">Save</button>
+        ${hasKey ? `<button class="ai-key-save-btn" style="background:#fee2e2;color:var(--danger);border-color:#fca5a5" onclick="clearAIKey()">Clear</button>` : ''}
       </div>
       <div class="ai-key-status ${hasKey ? 'set' : 'unset'}" id="ai-key-status">
         ${hasKey ? `✓ ${providerName} key saved` : `⚠ No ${providerName} key — AI generation will not work`}
