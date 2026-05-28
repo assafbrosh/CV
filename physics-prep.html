@@ -2899,10 +2899,12 @@ async function _autoGenerateMoreQuestions() {
 Include 5 multiple-choice and 3 short written-answer questions. Do NOT repeat these examples:
 ${JSON.stringify(samples)}
 
-If a question involves a shape or measurement, add a "diagram" field:
-  Right triangle: {"type":"right_triangle","a":"label","b":"label","c":"hypotenuse label","angleA":"label or ?","angleB":"label or ?"}
-  Circle: {"type":"circle","radius":"r label","showDiameter":false}
-  Use "?" for the unknown. Use null if no shape needed.
+IMPORTANT: At least 2 questions MUST include a "diagram" field (not null). Use:
+Right triangle: {"type":"right_triangle","a":"label or value","b":"label","c":"hypotenuse","angleA":"angle or ?","angleB":"angle or ?","highlight":"a|b|c"}
+General triangle: {"type":"triangle","a":"side","b":"side","c":"side","angleA":"angle","angleB":"angle","angleC":"angle"}
+Coordinate plane: {"type":"coordinate","points":[{"x":1,"y":2,"label":"A"},{"x":3,"y":4,"label":"B"}],"line":[{"x":1,"y":2},{"x":3,"y":4}]}
+Circle: {"type":"circle","radius":"r = ?","showDiameter":true,"diameter":"d"}
+Set "diagram":null only when truly no shape is relevant.
 
 Return ONLY a valid JSON array:
 [{"type":"mc","question":"...","options":["A","B","C","D"],"answer":0,"explanation":"...","diagram":null},
@@ -5445,13 +5447,27 @@ async function generateQuestionsFromExamples(topicId) {
     return s;
   });
 
-  // Always include diagram instructions — the AI decides when a shape is helpful
+  // Always include diagram instructions — require at least 3 diagram questions
   const diagramInstructions = `
-- If a question involves a shape, measurement or spatial relationship, add a "diagram" field using ONE of these exact structures:
-  Right triangle: {"type":"right_triangle","a":"label or value","b":"label or value","c":"hypotenuse label","angleA":"angle label or ?","angleB":"angle label or ?","highlight":"a|b|c"}
-  General triangle: {"type":"triangle","a":"side a","b":"side b","c":"side c","angleA":"angle A","angleB":"angle B","angleC":"angle C"}
-  Circle: {"type":"circle","radius":"r label","diameter":"d label","showDiameter":true}
-  Use "?" for the unknown the student must find. Set "diagram":null if no shape is needed.`;
+
+IMPORTANT: At least 3 of the 10 questions MUST include a "diagram" field (not null).
+Use the diagram type that best suits the question:
+
+Right triangle (sides/angles/Pythagoras/trig):
+  {"type":"right_triangle","a":"opposite value or ?","b":"adjacent value or ?","c":"hypotenuse or ?","angleA":"α or value","angleB":"β or value","highlight":"a"}
+  (highlight = the side being asked about: "a", "b", or "c")
+
+General triangle (angles, area, sine/cosine rule):
+  {"type":"triangle","a":"side a","b":"side b","c":"side c","angleA":"60°","angleB":"?","angleC":"70°"}
+
+Coordinate plane (points, lines, midpoint, distance, gradient):
+  {"type":"coordinate","points":[{"x":2,"y":3,"label":"A"},{"x":-1,"y":1,"label":"B"}],"line":[{"x":2,"y":3},{"x":-1,"y":1}]}
+  (x and y must be integers between -4 and 4; include "line" only when drawing a line segment)
+
+Circle (radius, diameter, circumference, area):
+  {"type":"circle","radius":"r = ?","diameter":"d = 10 cm","showDiameter":true}
+
+Set "diagram":null only for questions where no shape is relevant.`;
 
   const promptText = `You are a teacher creating quiz questions for Year 9 students about "${topic?.label || topicId}"${topic?.theory ? `. The topic covers: ${topic.theory.replace(/<[^>]+>/g,' ').trim()}` : ''}.
 
@@ -5469,33 +5485,33 @@ Return ONLY a valid JSON array — no markdown, no explanation, just the array:
 [
   {
     "type": "mc",
-    "question": "Question text",
-    "options": ["Option A","Option B","Option C","Option D"],
+    "question": "A right triangle has legs 3 cm and 4 cm. What is the hypotenuse?",
+    "options": ["5 cm","6 cm","7 cm","8 cm"],
     "answer": 0,
-    "explanation": "Why the correct answer is right",
-    "diagram": {"type":"right_triangle","a":"3 cm","b":"4 cm","c":"?","angleA":"","angleB":""}
+    "explanation": "Pythagoras: 3²+4²=25, √25=5",
+    "diagram": {"type":"right_triangle","a":"3 cm","b":"4 cm","c":"?","angleA":"","angleB":"","highlight":"c"}
   },
   {
     "type": "mc",
-    "question": "Another question with no diagram",
-    "options": ["Option A","Option B","Option C","Option D"],
-    "answer": 1,
-    "explanation": "Why the correct answer is right",
-    "diagram": null
+    "question": "Points A(1,2) and B(4,6). What is the gradient of AB?",
+    "options": ["4/3","3/4","1","2"],
+    "answer": 0,
+    "explanation": "gradient = (6-2)/(4-1) = 4/3",
+    "diagram": {"type":"coordinate","points":[{"x":1,"y":2,"label":"A"},{"x":4,"y":6,"label":"B"}],"line":[{"x":1,"y":2},{"x":4,"y":6}]}
   },
   {
     "type": "sa",
-    "question": "Written question text",
-    "answer": "Full model answer here",
-    "keywords": ["key1", "key2", "key3"],
-    "explanation": "Why this answer is correct",
+    "question": "Written question — no shape needed",
+    "answer": "Full model answer",
+    "keywords": ["key1","key2"],
+    "explanation": "Explanation here",
     "diagram": null
   }
 ]
 
 For "mc": "answer" is the 0-based index of the correct option.
-For "sa": "answer" is the full model answer, "keywords" are 2-4 key concepts the student must mention.
-Add "diagram" whenever a shape would help — use null when not needed.`;
+For "sa": "answer" is the full model answer, "keywords" are 2-4 key concepts.
+Remember: at least 3 questions must have a non-null diagram.`;
 
   try {
     let responseText;
