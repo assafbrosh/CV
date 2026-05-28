@@ -2906,7 +2906,7 @@ Return ONLY a valid JSON array:
     try {
       let text;
       if (provider === 'anthropic') {
-        const r = await fetch('https://api.anthropic.com/v1/messages', {
+        const r = await _aiFetch('https://api.anthropic.com/v1/messages', {
           method:'POST',
           headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
           body: JSON.stringify({ model:'claude-haiku-4-5-20251001', max_tokens:2000, messages:[{role:'user',content:prompt}] })
@@ -2914,7 +2914,7 @@ Return ONLY a valid JSON array:
         if (!r.ok) continue;
         const j = await r.json(); text = j.content?.[0]?.text || '';
       } else {
-        const r = await fetch('https://api.openai.com/v1/chat/completions', {
+        const r = await _aiFetch('https://api.openai.com/v1/chat/completions', {
           method:'POST',
           headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`},
           body: JSON.stringify({ model:'gpt-4o-mini', max_tokens:2000, temperature:0.8, messages:[{role:'system',content:'Return only valid JSON arrays.'},{role:'user',content:prompt}] })
@@ -4058,7 +4058,7 @@ async function testAIConnection() {
   try {
     let res;
     if (provider === 'anthropic') {
-      res = await fetch('https://api.anthropic.com/v1/messages', {
+      res = await _aiFetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -4073,7 +4073,7 @@ async function testAIConnection() {
         }),
       });
     } else {
-      res = await fetch('https://api.openai.com/v1/chat/completions', {
+      res = await _aiFetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
         body: JSON.stringify({
@@ -4469,6 +4469,24 @@ function _showSyncBadge(msg) {
   badge.style.color = msg.startsWith('⚠') ? '#ffcc80' : 'rgba(255,255,255,.85)';
   clearTimeout(badge._t);
   badge._t = setTimeout(() => { badge.style.opacity = '0'; }, msg.startsWith('⚠') ? 8000 : 3000);
+}
+
+// ── AI FETCH HELPER ───────────────────────────────────────────────────────────
+// Wraps all AI API calls with a timeout and clear error messages.
+async function _aiFetch(url, options, timeoutMs = 45000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...options, signal: ctrl.signal });
+    return res;
+  } catch(e) {
+    if (e.name === 'AbortError') throw new Error('Request timed out after 45s — slow network or API unreachable.');
+    // "Failed to fetch" = network blocked. Give actionable advice.
+    const msg = e.message || 'Failed to fetch';
+    throw new Error(`${msg} — possible causes: (1) ad blocker or iCloud Private Relay blocking api.anthropic.com, (2) your network restricts outbound HTTPS. Try: disable VPN/ad-blocker, switch networks, or use OpenAI instead.`);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // ── CLOUD SYNC (GITHUB GIST) ──────────────────────────────────────────────────
@@ -5228,7 +5246,7 @@ The "answer" field is the 0-based index of the correct option.`;
       imagePayloads.forEach(({ media_type, data }) => {
         content.push({ type: 'image', source: { type: 'base64', media_type, data } });
       });
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      const res = await _aiFetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -5252,7 +5270,7 @@ The "answer" field is the 0-based index of the correct option.`;
       imagePayloads.forEach(({ media_type, data }) => {
         userContent.push({ type: 'image_url', image_url: { url: `data:${media_type};base64,${data}`, detail: 'high' } });
       });
-      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      const res = await _aiFetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -5281,9 +5299,7 @@ The "answer" field is the 0-based index of the correct option.`;
     showGenReviewModal(topicId, generated);
 
   } catch(e) {
-    const isFetch = e.message.toLowerCase().includes('fetch') || e.message.toLowerCase().includes('network');
-    const hint = isFetch ? ' — check your internet connection or try the 🔌 Test Connection button in AI Settings' : '';
-    setStatus(`❌ ${e.message}${hint}`, 'var(--danger)');
+    setStatus(`❌ ${e.message}`, 'var(--danger)');
   } finally {
     setBtnText('🤖 From Benchmarks');
   }
@@ -5378,7 +5394,7 @@ For "sa": "answer" is the full model answer, "keywords" are 2-4 key concepts the
     let responseText;
 
     if (provider === 'anthropic') {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      const res = await _aiFetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -5396,7 +5412,7 @@ For "sa": "answer" is the full model answer, "keywords" are 2-4 key concepts the
       const json = await res.json();
       responseText = json.content?.[0]?.text || '';
     } else {
-      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      const res = await _aiFetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
         body: JSON.stringify({
@@ -5422,9 +5438,7 @@ For "sa": "answer" is the full model answer, "keywords" are 2-4 key concepts the
     showGenReviewModal(topicId, generated);
 
   } catch(e) {
-    const isFetch = e.message.toLowerCase().includes('fetch') || e.message.toLowerCase().includes('network');
-    const hint = isFetch ? ' — check your internet or try 🔌 Test Connection in AI Settings' : '';
-    setStatus(`❌ ${e.message}${hint}`, 'var(--danger)');
+    setStatus(`❌ ${e.message}`, 'var(--danger)');
   } finally {
     setBtn('✨ Generate from Examples');
   }
