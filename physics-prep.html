@@ -4041,8 +4041,10 @@ function renderAdminAISettings() {
         </button>
       </div>
       <p>Enter your <strong>${providerName} API key</strong>. It is stored only in your browser and sent only to ${providerName}'s API.</p>
-      ${hasKey ? `<div style="font-size:.8rem;color:var(--muted);margin-bottom:.4rem;background:#f3f4f6;padding:.35rem .6rem;border-radius:6px;font-family:monospace">
-        Saved: ${keyVal.slice(0,14)}…${keyVal.slice(-4)}
+      ${hasKey ? `<div style="font-size:.8rem;color:var(--muted);margin-bottom:.4rem;background:#f3f4f6;padding:.35rem .6rem;border-radius:6px;font-family:monospace;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+        <span>Saved: ${keyVal.slice(0,14)}…${keyVal.slice(-4)} &nbsp;(${keyVal.length} chars)</span>
+        <button onclick="toggleShowKey()" id="show-key-btn" style="font-size:.75rem;background:none;border:1px solid #ccc;border-radius:4px;padding:.1rem .4rem;cursor:pointer">👁 Show</button>
+        <span id="show-key-full" style="display:none;word-break:break-all;color:#202124">${keyVal}</span>
       </div>` : `<div style="font-size:.8rem;color:var(--danger);margin-bottom:.4rem">⚠ No key saved for ${providerName}</div>`}
       <div class="ai-key-row">
         <input class="ai-key-input" id="ai-key-input" type="text"
@@ -4051,7 +4053,7 @@ function renderAdminAISettings() {
         ${hasKey ? `<button class="ai-key-save-btn" style="background:#fee2e2;color:var(--danger);border-color:#fca5a5" onclick="clearAIKey()">Clear</button>` : ''}
       </div>
       <div class="ai-key-status ${hasKey ? 'set' : 'unset'}" id="ai-key-status">
-        ${hasKey ? `✓ ${providerName} key saved` : `⚠ No ${providerName} key — AI generation will not work`}
+        ${hasKey ? `✓ ${providerName} key saved (${keyVal.length} chars)` : `⚠ No ${providerName} key — AI generation will not work`}
       </div>
       <button class="admin-gen-btn" style="margin-top:.6rem" onclick="testAIConnection()">🔌 Test Connection</button>
       <div id="ai-test-result" style="font-size:.82rem;margin-top:.4rem"></div>
@@ -4155,9 +4157,14 @@ function saveAIKey() {
     if (statusEl) { statusEl.className = 'ai-key-status unset'; statusEl.textContent = '⚠ Nothing entered — key unchanged'; }
     return;
   }
+  const minLen = provider === 'anthropic' ? 90 : 40;
+  if (val.length < minLen) {
+    if (statusEl) { statusEl.className = 'ai-key-status unset'; statusEl.textContent = `⚠ Key looks too short (${val.length} chars — expected 100+). Did you copy the full key?`; }
+    return;
+  }
   localStorage.setItem(storageKey, val);
-  if (statusEl) { statusEl.className = 'ai-key-status set'; statusEl.textContent = `✓ ${name} key saved (${val.slice(0,10)}…)`; }
-  renderAdminAISettings(); // refresh to show new prefix display
+  if (statusEl) { statusEl.className = 'ai-key-status set'; statusEl.textContent = `✓ ${name} key saved (${val.length} chars)`; }
+  renderAdminAISettings();
 }
 
 function clearAIKey() {
@@ -4165,6 +4172,15 @@ function clearAIKey() {
   const storageKey = provider === 'openai' ? 'physPrepAIKey' : 'physPrepAIKeyAnthropic';
   localStorage.removeItem(storageKey);
   renderAdminAISettings();
+}
+
+function toggleShowKey() {
+  const full = document.getElementById('show-key-full');
+  const btn  = document.getElementById('show-key-btn');
+  if (!full) return;
+  const visible = full.style.display !== 'none';
+  full.style.display = visible ? 'none' : 'inline';
+  if (btn) btn.textContent = visible ? '👁 Show' : '🙈 Hide';
 }
 
 function renderAdminProfileTabs(activeId) {
