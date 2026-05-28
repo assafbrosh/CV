@@ -4054,43 +4054,80 @@ async function testAIConnection() {
   const apiKey = (localStorage.getItem(storageKey) || '').trim();
   const el = document.getElementById('ai-test-result');
   if (!el) return;
-  el.innerHTML = '⏳ Testing…';
+
+  const step = (n, msg, ok) => {
+    el.innerHTML += `<div style="margin:.2rem 0">${ok === true ? '✅' : ok === false ? '❌' : '⏳'} <b>Step ${n}:</b> ${msg}</div>`;
+  };
+  el.innerHTML = '<div style="font-size:.82rem;line-height:1.6">';
+
+  // Step 1: basic internet
+  step(1, 'Checking internet…', null);
+  try {
+    await fetch('https://www.gstatic.com/generate_204', { mode: 'no-cors', cache: 'no-store' });
+    el.innerHTML = el.innerHTML.replace('⏳ <b>Step 1:</b>', '✅ <b>Step 1:</b>');
+    el.innerHTML = el.innerHTML.replace('Checking internet…', 'Internet reachable');
+  } catch(e) {
+    el.innerHTML = el.innerHTML.replace('⏳ <b>Step 1:</b>', '❌ <b>Step 1:</b>');
+    el.innerHTML = el.innerHTML.replace('Checking internet…', 'No internet connection');
+    el.innerHTML += '<div style="color:var(--danger);margin-top:.4rem">→ Check your Wi-Fi or cable connection.</div></div>';
+    return;
+  }
+
+  // Step 2: API key present
+  step(2, 'Checking API key…', null);
+  if (!apiKey) {
+    el.innerHTML = el.innerHTML.replace('⏳ <b>Step 2:</b>', '❌ <b>Step 2:</b>');
+    el.innerHTML = el.innerHTML.replace('Checking API key…', 'No API key saved');
+    el.innerHTML += '<div style="color:var(--danger);margin-top:.4rem">→ Paste your API key in the field above and click Save.</div></div>';
+    return;
+  }
+  el.innerHTML = el.innerHTML.replace('⏳ <b>Step 2:</b>', '✅ <b>Step 2:</b>');
+  el.innerHTML = el.innerHTML.replace('Checking API key…', `Key present (${apiKey.slice(0,8)}…)`);
+
+  // Step 3: reach the AI endpoint
+  const apiName = provider === 'anthropic' ? 'Anthropic' : 'OpenAI';
+  step(3, `Contacting ${apiName} API…`, null);
   try {
     let res;
     if (provider === 'anthropic') {
       res = await _aiFetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 10,
-          messages: [{ role: 'user', content: 'Say "ok"' }],
-        }),
+        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+        body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 10, messages: [{ role: 'user', content: 'Say ok' }] }),
       });
     } else {
       res = await _aiFetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini', max_tokens: 5,
-          messages: [{ role: 'user', content: 'Say "ok"' }],
-        }),
+        body: JSON.stringify({ model: 'gpt-4o-mini', max_tokens: 5, messages: [{ role: 'user', content: 'Say ok' }] }),
       });
     }
     if (res.ok) {
-      el.innerHTML = '<span style="color:var(--success)">✅ Connection works! AI generation is ready.</span>';
+      el.innerHTML = el.innerHTML.replace('⏳ <b>Step 3:</b>', '✅ <b>Step 3:</b>');
+      el.innerHTML = el.innerHTML.replace(`Contacting ${apiName} API…`, `${apiName} responded OK`);
+      el.innerHTML += '<div style="color:var(--success);font-weight:600;margin-top:.4rem">✅ Everything works — AI generation is ready!</div>';
     } else {
       const j = await res.json().catch(() => ({}));
-      el.innerHTML = `<span style="color:var(--danger)">❌ HTTP ${res.status}: ${j?.error?.message || JSON.stringify(j)}</span>`;
+      const msg = j?.error?.message || `HTTP ${res.status}`;
+      el.innerHTML = el.innerHTML.replace('⏳ <b>Step 3:</b>', '❌ <b>Step 3:</b>');
+      el.innerHTML = el.innerHTML.replace(`Contacting ${apiName} API…`, `${apiName} rejected: ${msg}`);
+      const hint = res.status === 401 ? '→ Your API key is invalid or expired. Generate a new one.' :
+                   res.status === 429 ? '→ Rate limit hit. Wait a minute and try again.' :
+                   '→ Unexpected error from the API.';
+      el.innerHTML += `<div style="color:var(--danger);margin-top:.4rem">${hint}</div>`;
     }
   } catch(e) {
-    el.innerHTML = `<span style="color:var(--danger)">❌ ${e.message} — check your internet or try a different network.</span>`;
+    el.innerHTML = el.innerHTML.replace('⏳ <b>Step 3:</b>', '❌ <b>Step 3:</b>');
+    el.innerHTML = el.innerHTML.replace(`Contacting ${apiName} API…`, `Blocked: ${e.message.split('—')[0].trim()}`);
+    el.innerHTML += `<div style="color:var(--danger);margin-top:.4rem">
+      → The API endpoint is being blocked. Try these in order:<br>
+      1. Open this page in <b>Incognito / Private window</b> (disables extensions)<br>
+      2. Disable any <b>ad blocker or VPN</b> for this site<br>
+      3. Switch provider to <b>OpenAI</b> (sometimes less restricted)<br>
+      4. Try on a <b>different network</b> (mobile hotspot)
+    </div>`;
   }
+  el.innerHTML += '</div>';
 }
 
 function switchAIProvider(provider) {
