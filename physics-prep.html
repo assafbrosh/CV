@@ -2299,46 +2299,52 @@ function buildFreshTopicQueue(topicId) {
 }
 
 // ── CUSTOM TOPICS — GLOBAL STORAGE ───────────────────────────────────────────
-function loadCustomTopics() {
-  // Try global key first, then migrate per-profile keys
-  let raw = localStorage.getItem('physPrepCustom');
-  if (!raw) {
-    // Migration: merge all per-profile custom topics into global key
-    const allById = {};
-    try {
-      const profs = JSON.parse(localStorage.getItem('physPrepProfiles') || '[]');
-      profs.forEach(p => {
-        const pr = localStorage.getItem(`physPrepCustom_${p.id}`);
-        if (!pr) return;
-        try { JSON.parse(pr).forEach(ct => { if (!allById[ct.id]) allById[ct.id] = ct; }); } catch(e) {}
-      });
-    } catch(e) {}
-    if (Object.keys(allById).length) {
-      raw = JSON.stringify(Object.values(allById));
-      localStorage.setItem('physPrepCustom', raw);
+async function loadCustomTopics() {
+  // Try IndexedDB first, then migrate from localStorage
+  let customs = await _bmDB.get('physPrepCustom').catch(() => null);
+  if (!customs) {
+    let raw = localStorage.getItem('physPrepCustom');
+    if (!raw) {
+      // Migration: merge all per-profile custom topics into global key
+      const allById = {};
+      try {
+        const profs = JSON.parse(localStorage.getItem('physPrepProfiles') || '[]');
+        profs.forEach(p => {
+          const pr = localStorage.getItem(`physPrepCustom_${p.id}`);
+          if (!pr) return;
+          try { JSON.parse(pr).forEach(ct => { if (!allById[ct.id]) allById[ct.id] = ct; }); } catch(e) {}
+        });
+      } catch(e) {}
+      if (Object.keys(allById).length) raw = JSON.stringify(Object.values(allById));
+    }
+    if (raw) {
+      try { customs = JSON.parse(raw); } catch(e) {}
+      if (customs) {
+        await _bmDB.set('physPrepCustom', customs).catch(() => {});
+        localStorage.removeItem('physPrepCustom');
+      }
     }
   }
-  if (!raw) return;
-  try {
-    const customs = JSON.parse(raw);
-    customs.forEach(ct => {
-      if (!TOPICS.find(t => t.id === ct.id)) TOPICS.push(ct);
-      (ct.questions || []).forEach(q => {
-        if (!QBANK.find(x => x.id === q.id)) QBANK.push(q);
-      });
+  if (!customs) return;
+  customs.forEach(ct => {
+    if (!TOPICS.find(t => t.id === ct.id)) TOPICS.push(ct);
+    (ct.questions || []).forEach(q => {
+      if (!QBANK.find(x => x.id === q.id)) QBANK.push(q);
     });
-  } catch(e) {}
+  });
 }
 
-function saveCustomTopics() {
+async function saveCustomTopics() {
   // Save _custom topics with their questions
   const customs = TOPICS
     .filter(t => t._custom)
     .map(t => ({ ...t, questions: QBANK.filter(q => q.topic === t.id) }));
-  localStorage.setItem('physPrepCustom', JSON.stringify(customs));
+  await _bmDB.set('physPrepCustom', customs).catch(() => {});
+  localStorage.removeItem('physPrepCustom');
   // Save AI-generated / admin-added questions for built-in topics separately
   const extra = QBANK.filter(q => q._aiGenerated || q._adminAdded);
-  localStorage.setItem('physPrepExtraQuestions', JSON.stringify(extra));
+  await _bmDB.set('physPrepExtraQuestions', extra).catch(() => {});
+  localStorage.removeItem('physPrepExtraQuestions');
   _scheduleAutoSync();
 }
 
@@ -4497,7 +4503,7 @@ async function _silentPush() {
   const token = getGitHubToken();
   if (!token) return;
   try {
-    const content = JSON.stringify(collectAllData({ forCloud: true }), null, 2);
+    const content = JSON.stringify(await collectAllData({ forCloud: true }), null, 2);
     if (new Blob([content]).size > 8 * 1024 * 1024) return;
     const payload = { files: { [GIST_FILENAME]: { content } } };
     const gistId = getGistId();
@@ -4671,26 +4677,25 @@ function renderGHTokenStatus() {
   }
 }
 
-function collectAllData({ forCloud = false } = {}) {
+async function collectAllData({ forCloud = false } = {}) {
   const keys = {};
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
     if (!k || !k.startsWith('physPrep')) continue;
     if (k === 'physPrepGHToken' || k === 'physPrepGistId' || k === 'physPrepLastPush') continue;
     if (k === 'physPrepAIKey' || k === 'physPrepAIKeyAnthropic' || k === 'physPrepAIProvider') continue;
-    // Exclude large binary data from cloud sync (benchmarks are local reference materials)
     if (forCloud && k.startsWith('physPrepBenchmarks_')) continue;
     keys[k] = localStorage.getItem(k);
   }
 
-  // For cloud sync, also strip exerciseImage (base64) from question data to save space
-  if (forCloud && keys['physPrepExtraQuestions']) {
-    try {
-      const qs = JSON.parse(keys['physPrepExtraQuestions']);
-      keys['physPrepExtraQuestions'] = JSON.stringify(
-        qs.map(q => { const c = {...q}; delete c.exerciseImage; return c; })
-      );
-    } catch(e) { /* leave as-is */ }
+  // Read large data from IndexedDB
+  const customs = await _bmDB.get('physPrepCustom').catch(() => null);
+  if (customs) keys['physPrepCustom'] = JSON.stringify(customs);
+
+  let extra = await _bmDB.get('physPrepExtraQuestions').catch(() => null);
+  if (extra) {
+    if (forCloud) extra = extra.map(q => { const c = {...q}; delete c.exerciseImage; return c; });
+    keys['physPrepExtraQuestions'] = JSON.stringify(extra);
   }
 
   return { version: 1, exportedAt: Date.now(), data: keys };
@@ -4702,7 +4707,7 @@ async function pushDataToGitHub() {
   if (!token) { status.innerHTML = '<span style="color:var(--danger)">❌ No token set.</span>'; return; }
   status.innerHTML = '⏳ Saving to cloud…';
   try {
-    const content = JSON.stringify(collectAllData({ forCloud: true }), null, 2);
+    const content = JSON.stringify(await collectAllData({ forCloud: true }), null, 2);
     const sizeMB = (new Blob([content]).size / 1024 / 1024).toFixed(1);
     if (parseFloat(sizeMB) > 8) {
       status.innerHTML = `<span style="color:var(--danger)">❌ Data too large (${sizeMB}MB). Remove some benchmark images first.</span>`;
@@ -4841,8 +4846,8 @@ async function autoSyncOnStartup() {
   }
 }
 
-function downloadAllData() {
-  const json = JSON.stringify(collectAllData(), null, 2);
+async function downloadAllData() {
+  const json = JSON.stringify(await collectAllData(), null, 2);
   const blob = new Blob([json], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -5746,12 +5751,20 @@ function loadBuiltinOverrides() {
     }
   } catch(e) {}
 }
-function loadExtraQuestions() {
-  try {
+async function loadExtraQuestions() {
+  let extra = await _bmDB.get('physPrepExtraQuestions').catch(() => null);
+  if (!extra) {
     const raw = localStorage.getItem('physPrepExtraQuestions');
-    if (!raw) return;
-    JSON.parse(raw).forEach(q => { if (!QBANK.find(x => x.id === q.id)) QBANK.push(q); });
-  } catch(e) {}
+    if (raw) {
+      try { extra = JSON.parse(raw); } catch(e) {}
+      if (extra) {
+        await _bmDB.set('physPrepExtraQuestions', extra).catch(() => {});
+        localStorage.removeItem('physPrepExtraQuestions');
+      }
+    }
+  }
+  if (!extra) return;
+  extra.forEach(q => { if (!QBANK.find(x => x.id === q.id)) QBANK.push(q); });
 }
 
 // ── DATA REPAIR ───────────────────────────────────────────────────────────────
@@ -5800,21 +5813,21 @@ function repairDataCorruption() {
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-loadCustomSubjects();
-loadBuiltinOverrides();
-loadCustomTopics();
-loadExtraQuestions();
-// Suppress deleted built-in subjects and topics
-(function() {
+(async () => {
+  loadCustomSubjects();
+  loadBuiltinOverrides();
+  await loadCustomTopics();
+  await loadExtraQuestions();
+  // Suppress deleted built-in subjects and topics
   const dSubjs = JSON.parse(localStorage.getItem('physPrepDeletedSubjects') || '[]');
   const dTopics = JSON.parse(localStorage.getItem('physPrepDeletedTopics') || '[]');
   dSubjs.forEach(id => { const i = SUBJECTS.findIndex(s => s.id === id); if (i !== -1) SUBJECTS.splice(i, 1); });
   dTopics.forEach(id => { const i = TOPICS.findIndex(t => t.id === id); if (i !== -1) TOPICS.splice(i, 1); });
+  repairDataCorruption();
+  loadProfiles();
+  showProfileScreen();
+  autoSyncOnStartup();
 })();
-repairDataCorruption();
-loadProfiles();
-showProfileScreen();
-autoSyncOnStartup();
 </script>
 </body>
 </html>
