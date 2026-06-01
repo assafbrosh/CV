@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useStore } from '../store';
 import type { Document } from '../types';
@@ -13,37 +13,53 @@ function fileIcon(doc: Document) {
 export function DocumentViewer() {
   const { documents, addDocument, removeDocument } = useStore();
   const [selected, setSelected] = useState<Document | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function handleFiles(files: FileList | File[]) {
+    Array.from(files).forEach((file) => {
+      const isPdf = file.type.includes('pdf') || file.name.toLowerCase().endsWith('.pdf');
+      const isImage = file.type.startsWith('image/');
+      const url = URL.createObjectURL(file);
+      addDocument({
+        id: `doc_${Date.now()}_${Math.random()}`,
+        name: file.name,
+        type: isPdf ? 'pdf' : isImage ? 'image' : 'pdf',
+        dataUrl: url,
+      });
+    });
+  }
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
-    acceptedFiles.forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const isPdf = file.type.includes('pdf') || file.name.toLowerCase().endsWith('.pdf');
-        const isImage = file.type.startsWith('image/');
-        addDocument({
-          id: `doc_${Date.now()}_${Math.random()}`,
-          name: file.name,
-          type: isPdf ? 'pdf' : isImage ? 'image' : 'pdf',
-          dataUrl: reader.result as string,
-        });
-      };
-      reader.readAsDataURL(file);
-    });
-  }, [addDocument]);
+    handleFiles(acceptedFiles);
+  }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     multiple: true,
+    noClick: true,
   });
 
   return (
     <div className="flex h-full gap-4">
       <div className="w-48 flex flex-col gap-2">
+        {/* Drop zone */}
         <div {...getRootProps()}
-          className={`border-2 border-dashed rounded-lg p-3 text-center cursor-pointer transition-colors ${isDragActive ? 'border-blue-500 bg-blue-500/10' : 'border-slate-600 hover:border-slate-500'}`}>
+          className={`border-2 border-dashed rounded-lg p-3 text-center transition-colors ${isDragActive ? 'border-blue-500 bg-blue-500/10' : 'border-slate-600'}`}>
           <input {...getInputProps()} />
           <Upload size={20} className="mx-auto text-slate-500 mb-1" />
-          <p className="text-xs text-slate-500">Drop PDF, image, Excel, CSV or click</p>
+          <p className="text-xs text-slate-500 mb-2">Drag & drop files here</p>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full bg-blue-600 hover:bg-blue-500 text-white text-xs py-1.5 rounded">
+            Browse files
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            className="hidden"
+            onChange={(e) => e.target.files && handleFiles(e.target.files)}
+          />
         </div>
 
         <div className="flex-1 overflow-auto space-y-1">
