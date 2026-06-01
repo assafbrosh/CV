@@ -3846,6 +3846,7 @@ function loadProfiles() {
 
 function saveProfiles() {
   localStorage.setItem('physPrepProfiles', JSON.stringify(_profiles));
+  _scheduleAutoSync();
 }
 
 function renderProfileGrid() {
@@ -3934,7 +3935,7 @@ function saveProfile() {
     const id = 'p_' + Date.now();
     _profiles.push({ id, name, age, avatar: _selectedAvatar, color: _selectedColor, createdAt: new Date().toISOString() });
   }
-  saveProfiles();
+  saveProfiles(); // also calls _scheduleAutoSync
   closeProfileModal();
   renderProfileGrid();
 }
@@ -4906,6 +4907,8 @@ function saveSubjectModal() {
   }
   saveCustomSubjects();
   saveBuiltinOverrides();
+  saveBuiltinOverrides();
+  _scheduleAutoSync();
   closeSubjectModal();
   renderAdminAllSubjects();
   buildSubjectTabs();
@@ -5657,6 +5660,7 @@ function saveBuiltinOverrides() {
   });
   localStorage.setItem('physPrepSubjectOverrides', JSON.stringify(subjectOverrides));
   localStorage.setItem('physPrepTopicOverrides', JSON.stringify(topicOverrides));
+  _scheduleAutoSync();
 }
 function loadBuiltinOverrides() {
   try {
