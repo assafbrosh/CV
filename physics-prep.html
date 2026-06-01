@@ -4876,22 +4876,52 @@ function applyImportedData(raw) {
   setTimeout(() => location.reload(), 1000);
 }
 
-// ── BENCHMARK MATERIALS ───────────────────────────────────────────────────────
-function getBenchmarks(topicId) {
-  try { return JSON.parse(localStorage.getItem(`physPrepBenchmarks_${topicId}`) || '[]'); }
-  catch(e) { return []; }
+// ── BENCHMARK MATERIALS (IndexedDB — no 5 MB localStorage cap) ───────────────
+const _bmDB = (() => {
+  let _db = null;
+  function open() {
+    if (_db) return Promise.resolve(_db);
+    return new Promise((res, rej) => {
+      const req = indexedDB.open('physPrepBenchmarks', 1);
+      req.onupgradeneeded = e => e.target.result.createObjectStore('bm', { keyPath: 'key' });
+      req.onsuccess = e => { _db = e.target.result; res(_db); };
+      req.onerror = e => rej(e.target.error);
+    });
+  }
+  function tx(mode) { return open().then(db => db.transaction('bm', mode).objectStore('bm')); }
+  return {
+    get: key => tx('readonly').then(s => new Promise((res, rej) => {
+      const r = s.get(key); r.onsuccess = () => res(r.result?.value ?? []); r.onerror = e => rej(e.target.error);
+    })),
+    set: (key, value) => tx('readwrite').then(s => new Promise((res, rej) => {
+      const r = s.put({ key, value }); r.onsuccess = () => res(); r.onerror = e => rej(e.target.error);
+    })),
+    del: key => tx('readwrite').then(s => new Promise((res, rej) => {
+      const r = s.delete(key); r.onsuccess = () => res(); r.onerror = e => rej(e.target.error);
+    })),
+  };
+})();
+
+async function getBenchmarks(topicId) {
+  try { return await _bmDB.get(`benchmarks_${topicId}`); }
+  catch(e) {
+    try { return JSON.parse(localStorage.getItem(`physPrepBenchmarks_${topicId}`) || '[]'); }
+    catch(_) { return []; }
+  }
 }
-function saveBenchmarks(topicId, list) {
-  localStorage.setItem(`physPrepBenchmarks_${topicId}`, JSON.stringify(list));
+async function saveBenchmarks(topicId, list) {
+  await _bmDB.set(`benchmarks_${topicId}`, list);
+  // remove legacy localStorage entry if present
+  localStorage.removeItem(`physPrepBenchmarks_${topicId}`);
 }
-function addBenchmark(topicId, name, mimeType, dataUrl) {
-  const list = getBenchmarks(topicId);
+async function addBenchmark(topicId, name, mimeType, dataUrl) {
+  const list = await getBenchmarks(topicId);
   list.push({ id: 'bm_' + Date.now(), name, mimeType, dataUrl, uploadedAt: Date.now() });
-  saveBenchmarks(topicId, list);
+  await saveBenchmarks(topicId, list);
 }
-function deleteBenchmark(topicId, bmId) {
-  const list = getBenchmarks(topicId).filter(b => b.id !== bmId);
-  saveBenchmarks(topicId, list);
+async function deleteBenchmark(topicId, bmId) {
+  const list = (await getBenchmarks(topicId)).filter(b => b.id !== bmId);
+  await saveBenchmarks(topicId, list);
 }
 
 // ── SUBJECT / TOPIC MODALS ────────────────────────────────────────────────────
@@ -5089,7 +5119,7 @@ function adminToggleSubject(subjectId, headerEl) {
   if (open) renderAdminSubjectTopics(subjectId);
 }
 
-function renderAdminSubjectTopics(subjectId) {
+async function renderAdminSubjectTopics(subjectId) {
   const container = document.getElementById(`as-topics-${subjectId}`);
   container.innerHTML = '';
   const topics = TOPICS.filter(t => t.subjectId === subjectId);
@@ -5097,9 +5127,10 @@ function renderAdminSubjectTopics(subjectId) {
     container.innerHTML = '<p class="admin-no-data">No subjects yet. Use the button above to add one.</p>';
     return;
   }
-  topics.forEach(t => {
+  const bmCounts = await Promise.all(topics.map(t => getBenchmarks(t.id).then(l => l.length)));
+  topics.forEach((t, i) => {
     const qs   = QBANK.filter(q => q.topic === t.id);
-    const bms  = getBenchmarks(t.id);
+    const bmCount = bmCounts[i];
     const row  = document.createElement('div');
     row.className = 'admin-topic-card';
     row.style.margin = '0 0 .6rem 0';
@@ -5108,7 +5139,7 @@ function renderAdminSubjectTopics(subjectId) {
       <div class="admin-topic-header-row">
         <span>${t.icon}</span>
         <span class="atopic-label">${t.label}</span>
-        <span class="atopic-meta">${qs.length} Q · ${bms.length} benchmark${bms.length !== 1 ? 's' : ''}</span>
+        <span class="atopic-meta">${qs.length} Q · ${bmCount} benchmark${bmCount !== 1 ? 's' : ''}</span>
         <div style="display:flex;gap:.3rem" onclick="event.stopPropagation()">
           <button class="admin-icon-btn" onclick="openTopicModal('${subjectId}','${t.id}')">✏️</button>
           ${canDelete ? `<button class="admin-icon-btn danger" onclick="deleteTopic('${t.id}')">🗑</button>` : ''}
@@ -5133,9 +5164,9 @@ function adminToggleTopic(topicId, btn) {
   renderAdminBenchmarks(topicId);
 }
 
-function renderAdminBenchmarks(topicId) {
+async function renderAdminBenchmarks(topicId) {
   const container = document.getElementById(`admin-bm-${topicId}`);
-  const list = getBenchmarks(topicId);
+  const list = await getBenchmarks(topicId);
   const existingQs = QBANK.filter(q => q.topic === topicId);
   const typeIcon = mime => mime?.startsWith('image') ? '🖼️' : mime === 'application/pdf' ? '📄' : '📎';
   let html = `<div class="admin-bench-title">Benchmark Materials</div>
@@ -5189,15 +5220,16 @@ function adminUploadBenchmark(topicId, input) {
   const file = input.files?.[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = e => {
-    addBenchmark(topicId, file.name, file.type, e.target.result);
+  reader.onload = async e => {
+    await addBenchmark(topicId, file.name, file.type, e.target.result);
     renderAdminBenchmarks(topicId);
   };
   reader.readAsDataURL(file);
 }
 
-function adminViewBenchmark(topicId, bmId) {
-  const bm = getBenchmarks(topicId).find(b => b.id === bmId);
+async function adminViewBenchmark(topicId, bmId) {
+  const list = await getBenchmarks(topicId);
+  const bm = list.find(b => b.id === bmId);
   if (!bm) return;
   const win = window.open();
   if (bm.mimeType?.startsWith('image')) {
@@ -5207,9 +5239,9 @@ function adminViewBenchmark(topicId, bmId) {
   }
 }
 
-function adminDeleteBenchmark(topicId, bmId) {
+async function adminDeleteBenchmark(topicId, bmId) {
   if (!confirm('Delete this benchmark material?')) return;
-  deleteBenchmark(topicId, bmId);
+  await deleteBenchmark(topicId, bmId);
   renderAdminBenchmarks(topicId);
 }
 
@@ -5325,7 +5357,7 @@ async function generateQuestionsFromBenchmarks(topicId) {
   const statusEl = document.getElementById(`gen-bench-status-${topicId}`);
   const setStatus = (msg, color='var(--muted)') => { if (statusEl) statusEl.innerHTML = `<span style="color:${color}">${msg}</span>`; };
 
-  const benchmarks = getBenchmarks(topicId);
+  const benchmarks = await getBenchmarks(topicId);
   const hasUsable = benchmarks.some(b => _isImage(b) || _isPDF(b));
   if (!hasUsable) {
     setStatus('❌ Upload at least one benchmark file (PDF, JPG, or PNG) first.', 'var(--danger)');
