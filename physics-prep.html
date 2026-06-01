@@ -4896,7 +4896,7 @@ const _bmDB = (() => {
   function tx(mode) { return open().then(db => db.transaction('bm', mode).objectStore('bm')); }
   return {
     get: key => tx('readonly').then(s => new Promise((res, rej) => {
-      const r = s.get(key); r.onsuccess = () => res(r.result?.value ?? []); r.onerror = e => rej(e.target.error);
+      const r = s.get(key); r.onsuccess = () => res(r.result?.value ?? null); r.onerror = e => rej(e.target.error);
     })),
     set: (key, value) => tx('readwrite').then(s => new Promise((res, rej) => {
       const r = s.put({ key, value }); r.onsuccess = () => res(); r.onerror = e => rej(e.target.error);
@@ -4908,7 +4908,7 @@ const _bmDB = (() => {
 })();
 
 async function getBenchmarks(topicId) {
-  try { return await _bmDB.get(`benchmarks_${topicId}`); }
+  try { return (await _bmDB.get(`benchmarks_${topicId}`)) ?? []; }
   catch(e) {
     try { return JSON.parse(localStorage.getItem(`physPrepBenchmarks_${topicId}`) || '[]'); }
     catch(_) { return []; }
@@ -5541,8 +5541,9 @@ async function generateQuestionsFromExamples(topicId) {
     return s;
   });
 
-  // Always include diagram instructions — require at least 3 diagram questions
-  const diagramInstructions = `
+  // Only include diagram instructions for math topics
+  const isMathTopic = topic?.subjectId === 'math';
+  const diagramInstructions = isMathTopic ? `
 
 IMPORTANT: At least 3 of the 10 questions MUST include a "diagram" field (not null).
 Use the diagram type that best suits the question:
@@ -5561,22 +5562,12 @@ Coordinate plane (points, lines, midpoint, distance, gradient):
 Circle (radius, diameter, circumference, area):
   {"type":"circle","radius":"r = ?","diameter":"d = 10 cm","showDiameter":true}
 
-Set "diagram":null only for questions where no shape is relevant.`;
+Set "diagram":null only for questions where no shape is relevant.` : `
 
-  const promptText = `You are a teacher creating quiz questions for Year 9 students about "${topic?.label || topicId}"${topic?.theory ? `. The topic covers: ${topic.theory.replace(/<[^>]+>/g,' ').trim()}` : ''}.
+Set "diagram":null for all questions.`;
 
-Here are ${samples.length} example question(s) already in this topic (use them to understand the style, scope and subject matter — do NOT repeat them):
-
-${JSON.stringify(samples, null, 2)}
-
-Generate 10 NEW questions at ${diffInstruction}. The new questions must:
-- Cover the same subject matter but be clearly different from the examples above
-- Match the difficulty level specified (${difficulty})
-- Be varied: include 6 multiple-choice AND 4 short written-answer questions${diagramInstructions}
-
-Return ONLY a valid JSON array — no markdown, no explanation, just the array:
-
-[
+  // JSON format examples — math topics get math-shaped examples; all others get generic placeholders
+  const formatExample = isMathTopic ? `[
   {
     "type": "mc",
     "question": "A right triangle has legs 3 cm and 4 cm. What is the hypotenuse?",
@@ -5586,26 +5577,52 @@ Return ONLY a valid JSON array — no markdown, no explanation, just the array:
     "diagram": {"type":"right_triangle","a":"3 cm","b":"4 cm","c":"?","angleA":"","angleB":"","highlight":"c"}
   },
   {
-    "type": "mc",
-    "question": "Points A(1,2) and B(4,6). What is the gradient of AB?",
-    "options": ["4/3","3/4","1","2"],
-    "answer": 0,
-    "explanation": "gradient = (6-2)/(4-1) = 4/3",
-    "diagram": {"type":"coordinate","points":[{"x":1,"y":2,"label":"A"},{"x":4,"y":6,"label":"B"}],"line":[{"x":1,"y":2},{"x":4,"y":6}]}
-  },
-  {
     "type": "sa",
-    "question": "Written question — no shape needed",
+    "question": "Written question example",
     "answer": "Full model answer",
     "keywords": ["key1","key2"],
     "explanation": "Explanation here",
     "diagram": null
   }
-]
+]` : `[
+  {
+    "type": "mc",
+    "question": "Multiple-choice question about ${topic?.label || topicId}",
+    "options": ["Option A","Option B","Option C","Option D"],
+    "answer": 0,
+    "explanation": "Why option A is correct",
+    "diagram": null
+  },
+  {
+    "type": "sa",
+    "question": "Short-answer question about ${topic?.label || topicId}",
+    "answer": "Full model answer",
+    "keywords": ["key1","key2"],
+    "explanation": "Explanation here",
+    "diagram": null
+  }
+]`;
+
+  const diagramReminder = isMathTopic ? `\nRemember: at least 3 questions must have a non-null diagram.` : '';
+
+  const promptText = `You are a teacher creating quiz questions for Year 9 students about "${topic?.label || topicId}"${topic?.theory ? `. The topic covers: ${topic.theory.replace(/<[^>]+>/g,' ').trim()}` : ''}.
+
+Here are ${samples.length} example question(s) already in this topic (use them to understand the style, scope and subject matter — do NOT repeat them):
+
+${JSON.stringify(samples, null, 2)}
+
+Generate 10 NEW questions at ${diffInstruction}. The new questions must:
+- Be strictly about "${topic?.label || topicId}" — do NOT introduce unrelated subjects
+- Cover the same subject matter but be clearly different from the examples above
+- Match the difficulty level specified (${difficulty})
+- Be varied: include 6 multiple-choice AND 4 short written-answer questions${diagramInstructions}
+
+Return ONLY a valid JSON array — no markdown, no explanation, just the array:
+
+${formatExample}
 
 For "mc": "answer" is the 0-based index of the correct option.
-For "sa": "answer" is the full model answer, "keywords" are 2-4 key concepts.
-Remember: at least 3 questions must have a non-null diagram.`;
+For "sa": "answer" is the full model answer, "keywords" are 2-4 key concepts.${diagramReminder}`;
 
   try {
     let responseText;
