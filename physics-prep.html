@@ -4677,6 +4677,7 @@ function collectAllData({ forCloud = false } = {}) {
     const k = localStorage.key(i);
     if (!k || !k.startsWith('physPrep')) continue;
     if (k === 'physPrepGHToken' || k === 'physPrepGistId' || k === 'physPrepLastPush') continue;
+    if (k === 'physPrepAIKey' || k === 'physPrepAIKeyAnthropic' || k === 'physPrepAIProvider') continue;
     // Exclude large binary data from cloud sync (benchmarks are local reference materials)
     if (forCloud && k.startsWith('physPrepBenchmarks_')) continue;
     keys[k] = localStorage.getItem(k);
@@ -4792,7 +4793,7 @@ async function pullDataFromGitHub(silent) {
     const data = parsed.data || parsed;
     let count = 0;
     Object.entries(data).forEach(([k, v]) => {
-      if (k.startsWith('physPrep') && k !== 'physPrepGHToken' && k !== 'physPrepGistId') { localStorage.setItem(k, v); count++; }
+      if (k.startsWith('physPrep') && k !== 'physPrepGHToken' && k !== 'physPrepGistId' && k !== 'physPrepAIKey' && k !== 'physPrepAIKeyAnthropic' && k !== 'physPrepAIProvider') { localStorage.setItem(k, v); count++; }
     });
     // Mark local as up-to-date to prevent auto-sync loop on next load
     localStorage.setItem('physPrepLastPush', (parsed.exportedAt || Date.now()).toString());
@@ -4827,7 +4828,7 @@ async function autoSyncOnStartup() {
     const data = parsed.data || parsed;
     let count = 0;
     Object.entries(data).forEach(([k, v]) => {
-      if (k.startsWith('physPrep') && k !== 'physPrepGHToken' && k !== 'physPrepGistId') { localStorage.setItem(k, v); count++; }
+      if (k.startsWith('physPrep') && k !== 'physPrepGHToken' && k !== 'physPrepGistId' && k !== 'physPrepAIKey' && k !== 'physPrepAIKeyAnthropic' && k !== 'physPrepAIProvider') { localStorage.setItem(k, v); count++; }
     });
     // Mark local as up-to-date so we don't reload on next visit
     localStorage.setItem('physPrepLastPush', remoteTs.toString());
@@ -4869,7 +4870,7 @@ function applyImportedData(raw) {
   const data = parsed.data || parsed;
   let count = 0;
   Object.entries(data).forEach(([k, v]) => {
-    if (k.startsWith('physPrep') && k !== 'physPrepGHToken') { localStorage.setItem(k, v); count++; }
+    if (k.startsWith('physPrep') && k !== 'physPrepGHToken' && k !== 'physPrepAIKey' && k !== 'physPrepAIKeyAnthropic' && k !== 'physPrepAIProvider') { localStorage.setItem(k, v); count++; }
   });
   if (status) status.innerHTML = `<span style="color:var(--success)">✅ Restored ${count} records. Reloading…</span>`;
   setTimeout(() => location.reload(), 1000);
