@@ -1123,6 +1123,7 @@
       <label>Colour</label>
       <div style="display:flex;gap:.5rem;flex-wrap:wrap" id="smod-colors"></div>
     </div>
+    <div id="smod-error" style="color:var(--danger);font-size:.85rem;margin-bottom:.3rem;display:none"></div>
     <div class="modal-actions">
       <button class="modal-cancel-btn" onclick="closeSubjectModal()">Cancel</button>
       <button class="modal-save-btn" onclick="saveSubjectModal()">Save Subject</button>
@@ -1153,6 +1154,7 @@
       <label>Theory / Reference (HTML or plain text, optional)</label>
       <textarea id="tmod-theory" rows="4" style="width:100%;padding:.5rem;border:1.5px solid var(--border);border-radius:8px;font-size:.9rem;resize:vertical" placeholder="Short explanation students can read before answering questions…"></textarea>
     </div>
+    <div id="tmod-error" style="color:var(--danger);font-size:.85rem;margin-bottom:.3rem;display:none"></div>
     <div class="modal-actions">
       <button class="modal-cancel-btn" onclick="closeTopicModal()">Cancel</button>
       <button class="modal-save-btn" onclick="saveTopicModal()">Save Topic</button>
@@ -1211,6 +1213,7 @@
       <label>Colour</label>
       <div class="color-picker" id="color-picker"></div>
     </div>
+    <div id="prof-error" style="color:var(--danger);font-size:.85rem;margin-bottom:.3rem;display:none"></div>
     <div class="modal-actions">
       <button class="modal-cancel-btn" onclick="closeProfileModal()">Cancel</button>
       <button class="modal-save-btn" onclick="saveProfile()">Save</button>
@@ -3783,7 +3786,7 @@ function saveCustomSubject() {
   const name = document.getElementById('subj-name').value.trim();
   const icon = document.getElementById('subj-icon').value.trim() || '📚';
   const desc = document.getElementById('subj-desc').value.trim() || name;
-  if (!name) { alert('Please enter a subject name.'); return; }
+  if (!name) { console.warn('no name'); return; }
   if (!_pendingQuestions.length) { alert('Add at least one question.'); return; }
 
   // If we're adding to an existing topic (from admin panel), skip creating a new topic
@@ -3925,8 +3928,11 @@ function closeProfileModal() {
 function saveProfile() {
   const name = document.getElementById('prof-name').value.trim();
   const age  = parseInt(document.getElementById('prof-age').value, 10);
-  if (!name) { alert('Please enter a name.'); return; }
-  if (!age || age < 1) { alert('Please enter a valid age.'); return; }
+  const pErrEl = document.getElementById('prof-error');
+  const showPErr = msg => { if (pErrEl) { pErrEl.textContent = msg; pErrEl.style.display = 'block'; } };
+  if (!name) { showPErr('⚠ Please enter a name.'); return; }
+  if (!age || age < 1) { showPErr('⚠ Please enter a valid age.'); return; }
+  if (pErrEl) pErrEl.style.display = 'none';
 
   if (_editingProfileId) {
     const p = _profiles.find(p => p.id === _editingProfileId);
@@ -4920,7 +4926,12 @@ function saveSubjectModal() {
   const name  = document.getElementById('smod-name').value.trim();
   const icon  = document.getElementById('smod-icon').value.trim() || '📚';
   const desc  = document.getElementById('smod-desc').value.trim() || name;
-  if (!name) { alert('Please enter a subject name.'); return; }
+  const sErrEl = document.getElementById('smod-error');
+  if (!name) {
+    if (sErrEl) { sErrEl.textContent = '⚠ Please enter a subject name.'; sErrEl.style.display = 'block'; }
+    return;
+  }
+  if (sErrEl) sErrEl.style.display = 'none';
   if (_editingSubjectId && _editingSubjectId !== '__keep__') {
     const s = SUBJECTS.find(s => s.id === _editingSubjectId);
     if (s) { s.label = name; s.icon = icon; s.desc = desc; s.color = _selectedSubjectColor; s._edited = true; }
@@ -4930,8 +4941,6 @@ function saveSubjectModal() {
   }
   saveCustomSubjects();
   saveBuiltinOverrides();
-  saveBuiltinOverrides();
-  _scheduleAutoSync();
   closeSubjectModal();
   renderAdminAllSubjects();
   buildSubjectTabs();
@@ -4979,7 +4988,12 @@ function saveTopicModal() {
   const icon   = document.getElementById('tmod-icon').value.trim() || '📚';
   const desc   = document.getElementById('tmod-desc').value.trim() || name;
   const theory = document.getElementById('tmod-theory').value.trim();
-  if (!name) { alert('Please enter a topic name.'); return; }
+  const errEl = document.getElementById('tmod-error');
+  if (!name) {
+    if (errEl) { errEl.textContent = '⚠ Please enter a topic name.'; errEl.style.display = 'block'; }
+    return;
+  }
+  if (errEl) errEl.style.display = 'none';
   if (_editingTopicId) {
     const t = TOPICS.find(t => t.id === _editingTopicId);
     if (t) { t.label = name; t.icon = icon; t.desc = desc; t.theory = theory || t.theory; t._edited = true; }
