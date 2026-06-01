@@ -1064,9 +1064,9 @@
 
     <div class="admin-section-title" style="margin-top:1.5rem">☁️ Cloud Sync (GitHub)</div>
     <div class="data-transfer-box">
-      <p>Your data is saved to GitHub and loads automatically on every device. Set your GitHub token once.</p>
+      <div id="sync-device-status" style="margin-bottom:.75rem"></div>
       <div class="ai-key-row" style="margin-bottom:.5rem;">
-        <input type="password" id="gh-token-input" class="ai-key-input" placeholder="GitHub Personal Access Token (repo scope)">
+        <input type="password" id="gh-token-input" class="ai-key-input" placeholder="GitHub Personal Access Token (gist scope)">
         <button class="ai-key-save-btn" onclick="saveGitHubToken()">Save</button>
       </div>
       <div id="gh-token-status" class="ai-key-status"></div>
@@ -4632,14 +4632,37 @@ function saveGitHubToken() {
 
 function renderGHTokenStatus() {
   const el = document.getElementById('gh-token-status');
-  if (!el) return;
+  const ds = document.getElementById('sync-device-status');
   const t = getGitHubToken();
   const g = getGistId();
   const lastPush = parseInt(localStorage.getItem('physPrepLastPush') || '0');
-  const lastPushStr = lastPush ? new Date(lastPush).toLocaleString() : 'never';
-  if (t && g) { el.className = 'ai-key-status set'; el.innerHTML = `✅ Token saved · Gist: ${g.slice(0,8)}… · Last sync: ${lastPushStr}`; }
-  else if (t)  { el.className = 'ai-key-status set'; el.textContent = '✅ Token saved — click "Push to Cloud" to create your sync gist'; }
-  else         { el.className = 'ai-key-status unset'; el.textContent = '⚠ No token set — enter your GitHub token to enable cross-device sync'; }
+  const lastStr = lastPush ? new Date(lastPush).toLocaleString() : 'never';
+
+  if (el) {
+    if (t && g) { el.className = 'ai-key-status set'; el.innerHTML = `✅ Token saved · Gist: ${g.slice(0,8)}… · Last sync: ${lastStr}`; }
+    else if (t)  { el.className = 'ai-key-status set'; el.textContent = '✅ Token saved — click "Push to Cloud" once to create the gist'; }
+    else         { el.className = 'ai-key-status unset'; el.textContent = '⚠ No token set on this device'; }
+  }
+
+  if (ds) {
+    if (!t) {
+      ds.innerHTML = `<div style="background:#fff3cd;border:1.5px solid #ffc107;border-radius:8px;padding:.7rem .9rem;font-size:.85rem">
+        ⚠️ <strong>This device is not set up for sync.</strong><br>
+        Paste the same GitHub token below that you used on your other device, then click Save.
+        Data will pull automatically on next load.
+      </div>`;
+    } else if (!g) {
+      ds.innerHTML = `<div style="background:#fff3cd;border:1.5px solid #ffc107;border-radius:8px;padding:.7rem .9rem;font-size:.85rem">
+        ⚠️ <strong>Token saved but no gist linked yet.</strong><br>
+        Click <b>Pull from Cloud</b> to find and import your existing cloud data.
+      </div>`;
+    } else {
+      ds.innerHTML = `<div style="background:#e6f4ea;border:1.5px solid #81c995;border-radius:8px;padding:.7rem .9rem;font-size:.85rem">
+        ✅ <strong>Sync active on this device.</strong> Last sync: ${lastStr}<br>
+        Click <b>Pull from Cloud</b> to import the latest data from your other device right now.
+      </div>`;
+    }
+  }
 }
 
 function collectAllData({ forCloud = false } = {}) {
