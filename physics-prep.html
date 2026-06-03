@@ -1392,6 +1392,18 @@ const TOPICS = [
 </ul>
 <p>Common values: sin 30° = 0.5, cos 60° = 0.5, sin 45° = cos 45° = √2/2 ≈ 0.707</p>`
   },
+  {
+    id:'sim_triangles',subjectId:'math', label:'Similar Triangles', icon:'🔺', desc:'Similarity theorems, scale factors and missing sides',
+    theory:`<p><strong>Similar triangles</strong> have the same shape but different sizes. All corresponding angles are equal and corresponding sides are in proportion.</p>
+<p><strong>Three similarity theorems:</strong></p>
+<ul>
+  <li><strong>AA (Angle-Angle):</strong> Two pairs of equal angles → triangles are similar.</li>
+  <li><strong>SSS (Side-Side-Side):</strong> All three pairs of corresponding sides in the same ratio → similar.</li>
+  <li><strong>SAS (Side-Angle-Side):</strong> Two sides in the same ratio AND the included angle equal → similar.</li>
+</ul>
+<p><strong>Scale factor:</strong> If △ABC ~ △DEF, then AB/DE = BC/EF = AC/DF = k (the scale factor).</p>
+<p>Use cross-multiplication to find missing sides: if a/b = c/x, then x = bc/a.</p>`
+  },
 ];
 
 const QBANK = [
@@ -1960,6 +1972,174 @@ const QBANK = [
     answer:1,
     explanation:'h² = 5² − 3² = 25 − 9 = 16, h = 4 m.',
     walkthrough:['The ladder, wall, and ground form a right triangle','h² = 5² − 3² = 25 − 9 = 16','h = √16 = 4 m'],
+  },
+
+  // ── SIMILAR TRIANGLES ──────────────────────────────────────────────────────
+
+  // Part 1: Identify the similarity theorem (or "not similar")
+  {
+    id:'st1', topic:'sim_triangles', type:'mc',
+    question:'△ABC has sides 4, 6, 8. △DEF has sides 6, 9, 12. Are they similar? If so, by which theorem?',
+    options:['Yes – SSS similarity','Yes – SAS similarity','Yes – AA similarity','Not similar'],
+    answer:0,
+    explanation:'Check all three ratios: 4/6 = 6/9 = 8/12 = 2/3. All equal → SSS similarity theorem.',
+    walkthrough:['Divide each side of △ABC by the corresponding side of △DEF','4/6 = 2/3, 6/9 = 2/3, 8/12 = 2/3','All three ratios are equal → SSS similarity with scale factor 2:3'],
+  },
+  {
+    id:'st2', topic:'sim_triangles', type:'mc',
+    question:'△PQR has sides 5, 8, 11. △XYZ has sides 10, 16, 21. Are they similar?',
+    options:['Not similar','Yes – SSS similarity','Yes – SAS similarity','Yes – AA similarity'],
+    answer:0,
+    explanation:'Check ratios: 5/10 = 0.5, 8/16 = 0.5, but 11/21 ≈ 0.524 ≠ 0.5. Ratios are not all equal, so the triangles are NOT similar.',
+    walkthrough:['Compute 5/10 = 1/2','Compute 8/16 = 1/2','Compute 11/21 ≈ 0.524 ≠ 1/2 → ratios not equal → not similar'],
+  },
+  {
+    id:'st3', topic:'sim_triangles', type:'mc',
+    question:'Both △ABC and △DEF contain angles of 47° and 63°. Are the triangles similar?',
+    options:['Yes – AA similarity','Yes – SSS similarity','Not similar – need side lengths too','Yes – SAS similarity'],
+    answer:0,
+    explanation:'The third angle of each triangle = 180° − 47° − 63° = 70°. All three angles match → AA similarity (no side lengths needed).',
+    walkthrough:['Third angle of △ABC = 180 − 47 − 63 = 70°','Third angle of △DEF = 70° (same)','Two pairs of equal angles → AA similarity theorem'],
+  },
+  {
+    id:'st4', topic:'sim_triangles', type:'mc',
+    question:'△LMN has sides 7 and 10 with an included angle of 50°. △PQR has sides 14 and 20 with an included angle of 50°. Are they similar?',
+    options:['Yes – SAS similarity','Not similar','Yes – SSS similarity','Yes – AA similarity'],
+    answer:0,
+    explanation:'Ratios of corresponding sides: 7/14 = 1/2 and 10/20 = 1/2. Equal ratios PLUS the same included angle (50°) → SAS similarity.',
+    walkthrough:['Check side ratios: 7/14 = 1/2, 10/20 = 1/2 ✓','Included angle is 50° in both triangles ✓','Two sides in equal ratio with equal included angle → SAS similarity'],
+  },
+  {
+    id:'st5', topic:'sim_triangles', type:'mc',
+    question:'△ABC has sides 3 and 5 around a 40° angle. △DEF has sides 6 and 9 around a 40° angle. Are they similar?',
+    options:['Not similar','Yes – SAS similarity','Yes – SSS similarity','Yes – AA similarity'],
+    answer:0,
+    explanation:'For SAS similarity, BOTH side ratios must be equal. 3/6 = 1/2 but 5/9 ≈ 0.556 ≠ 1/2. The included angle alone is not enough if the side ratios differ.',
+    walkthrough:['Check ratios: 3/6 = 1/2','Check ratios: 5/9 ≈ 0.556','Ratios are unequal even though the included angle matches → SAS does NOT apply → not similar'],
+  },
+  {
+    id:'st6', topic:'sim_triangles', type:'mc',
+    question:'△RST has sides 8, 12, 16. △UVW has sides 10, 15, 20. Are they similar? If so, by which theorem?',
+    options:['Yes – SSS similarity','Not similar','Yes – AA similarity','Yes – SAS similarity'],
+    answer:0,
+    explanation:'8/10 = 4/5, 12/15 = 4/5, 16/20 = 4/5. All three ratios equal → SSS similarity with scale factor 4:5.',
+    walkthrough:['8/10 = 4/5','12/15 = 4/5','16/20 = 4/5 → all equal → SSS similarity'],
+  },
+  {
+    id:'st7', topic:'sim_triangles', type:'mc',
+    question:'△ABC and △DEF each have ONE angle equal to 35°. Can you conclude the triangles are similar?',
+    options:['No – at least two pairs of equal angles are needed (AA)','Yes – one equal angle is enough','Yes – by SAS similarity','Yes – by SSS similarity'],
+    answer:0,
+    explanation:'AA similarity requires TWO pairs of equal angles. One matching angle is not sufficient to guarantee similarity.',
+    walkthrough:['AA theorem: need 2 pairs of equal angles','One shared angle could appear in triangles that are very different in shape','Cannot conclude similar from one angle alone'],
+  },
+  {
+    id:'st8', topic:'sim_triangles', type:'mc',
+    question:'△ABC has sides 15, 20, 25. △DEF has sides 9, 12, 15. Are they similar?',
+    options:['Yes – SSS similarity','Not similar','Yes – AA similarity','Yes – SAS similarity'],
+    answer:0,
+    explanation:'15/9 = 5/3, 20/12 = 5/3, 25/15 = 5/3. All equal → SSS similarity. Both are scaled versions of the 3-4-5 right triangle.',
+    walkthrough:['15/9 = 5/3','20/12 = 5/3','25/15 = 5/3 → all equal → SSS similarity (scale factor 5:3)'],
+  },
+
+  // Part 2: Find the missing length
+  {
+    id:'st9', topic:'sim_triangles', type:'mc',
+    question:'△ABC ~ △DEF. AB = 8, BC = 12, DE = 6. Find EF.',
+    options:['8','9','10','12'],
+    answer:1,
+    explanation:'Scale factor = DE/AB = 6/8 = 3/4. EF = BC × (3/4) = 12 × 3/4 = 9.',
+    walkthrough:['Identify the scale factor: DE/AB = 6/8 = 3/4','Apply to the corresponding side: EF = BC × scale factor','EF = 12 × 3/4 = 9'],
+  },
+  {
+    id:'st10', topic:'sim_triangles', type:'mc',
+    question:'△PQR ~ △XYZ. PQ = 10, QR = 15, XY = 4. Find YZ.',
+    options:['5','6','7','8'],
+    answer:1,
+    explanation:'Scale factor = XY/PQ = 4/10 = 2/5. YZ = QR × (2/5) = 15 × 2/5 = 6.',
+    walkthrough:['Scale factor = 4/10 = 2/5','YZ corresponds to QR','YZ = 15 × 2/5 = 6'],
+  },
+  {
+    id:'st11', topic:'sim_triangles', type:'mc',
+    question:'Two similar triangles: the first has sides 5, ?, 13. The second (larger) has sides 15, 36, 39. Find the missing side of the first triangle.',
+    options:['10','11','12','14'],
+    answer:2,
+    explanation:'Matching sides: 5↔15 (ratio 1:3), 13↔39 (ratio 1:3). So the missing side = 36 ÷ 3 = 12.',
+    walkthrough:['Scale factor: 15/5 = 3 and 39/13 = 3 ✓','The side 36 in the larger triangle corresponds to the missing side in the smaller one','Missing side = 36/3 = 12'],
+  },
+  {
+    id:'st12', topic:'sim_triangles', type:'mc',
+    question:'△ABC ~ △DEF. AB = 21, BC = 28, DE = 9. Find EF.',
+    options:['10','12','14','16'],
+    answer:1,
+    explanation:'Scale factor = DE/AB = 9/21 = 3/7. EF = BC × (3/7) = 28 × 3/7 = 12.',
+    walkthrough:['Scale factor = 9/21 = 3/7','EF = 28 × 3/7 = 12'],
+  },
+  {
+    id:'st13', topic:'sim_triangles', type:'mc',
+    question:'The ratio of similarity between two triangles is 3:5. A side of the smaller triangle is 18. What is the corresponding side of the larger triangle?',
+    options:['24','27','30','33'],
+    answer:2,
+    explanation:'Let the larger side = x. 18/x = 3/5. Cross-multiply: 3x = 90, x = 30.',
+    walkthrough:['Set up proportion: smaller/larger = 3/5','18/x = 3/5','Cross-multiply: 3x = 90, so x = 30'],
+  },
+  {
+    id:'st14', topic:'sim_triangles', type:'mc',
+    question:'△JKL ~ △PQR. JK = 35, KL = 28, PQ = 25. Find QR.',
+    options:['16','18','20','22'],
+    answer:2,
+    explanation:'Scale factor = PQ/JK = 25/35 = 5/7. QR = KL × (5/7) = 28 × 5/7 = 20.',
+    walkthrough:['Scale factor = 25/35 = 5/7','QR = 28 × 5/7 = 20'],
+  },
+
+  // Part 3: Solve for x
+  {
+    id:'st15', topic:'sim_triangles', type:'mc',
+    question:'△ABC ~ △DEF. AC = 12, DF = 24, AB = 3x + 1, DE = 14. Solve for x.',
+    options:['1','2','3','4'],
+    answer:1,
+    explanation:'Scale factor = AC/DF = 12/24 = 1/2. So AB = DE × (1/2) = 7. Solve 3x + 1 = 7 → 3x = 6 → x = 2.',
+    walkthrough:['Find scale factor: AC/DF = 12/24 = 1/2','AB must equal DE × 1/2 = 14 × 1/2 = 7','Solve 3x + 1 = 7 → x = 2'],
+  },
+  {
+    id:'st16', topic:'sim_triangles', type:'mc',
+    question:'△ABC ~ △DEF. AB = 5x, BC = 18, DE = 20, EF = 24. Solve for x.',
+    options:['2','3','4','5'],
+    answer:1,
+    explanation:'Ratio: DE/AB = EF/BC → 20/(5x) = 24/18 = 4/3. So 5x = 20 × 3/4 = 15, x = 3.',
+    walkthrough:['Set up ratio: EF/BC = 24/18 = 4/3','Apply: DE/AB = 4/3 → 20/(5x) = 4/3','Cross-multiply: 60 = 20x → x = 3'],
+  },
+  {
+    id:'st17', topic:'sim_triangles', type:'mc',
+    question:'△PQR ~ △STU. PQ = 2x + 4, ST = 14, QR = 12, TU = 21. Solve for x.',
+    options:['1','2','3','4'],
+    answer:1,
+    explanation:'Scale factor = QR/TU = 12/21 = 4/7. PQ = ST × (4/7) = 14 × 4/7 = 8. Solve 2x + 4 = 8 → 2x = 4 → x = 2.',
+    walkthrough:['Scale factor = 12/21 = 4/7','PQ = 14 × 4/7 = 8','Solve 2x + 4 = 8 → x = 2'],
+  },
+  {
+    id:'st18', topic:'sim_triangles', type:'mc',
+    question:'△ABC ~ △DEF. AB = 6x + 3, BC = 15, DE = 35, EF = 25. Solve for x.',
+    options:['2','3','4','5'],
+    answer:1,
+    explanation:'Ratio: DE/AB = EF/BC → 35/(6x+3) = 25/15 = 5/3. Cross-multiply: 105 = 5(6x+3) = 30x+15. So 30x = 90, x = 3.',
+    walkthrough:['Set ratio: EF/BC = 25/15 = 5/3','Apply: DE/(6x+3) = 5/3','Cross-multiply: 3·35 = 5(6x+3) → 105 = 30x+15 → x = 3'],
+  },
+  {
+    id:'st19', topic:'sim_triangles', type:'mc',
+    question:'△JKL ~ △PQR. JK = 4x + 2, PQ = 33, KL = 18, QR = 27. Solve for x.',
+    options:['4','5','6','7'],
+    answer:1,
+    explanation:'Scale factor = KL/QR = 18/27 = 2/3. JK = PQ × (2/3) = 33 × 2/3 = 22. Solve 4x + 2 = 22 → 4x = 20 → x = 5.',
+    walkthrough:['Scale factor = 18/27 = 2/3','JK = 33 × 2/3 = 22','Solve 4x + 2 = 22 → x = 5'],
+  },
+  {
+    id:'st20', topic:'sim_triangles', type:'mc',
+    question:'Two similar triangles. The larger has sides 70 and (11x − 4). The smaller has sides 50 and 60. The side 70 corresponds to 50. Solve for x.',
+    options:['6','7','8','9'],
+    answer:2,
+    explanation:'Ratio: 70/50 = 7/5. So (11x − 4)/60 = 7/5. Cross-multiply: 5(11x−4) = 420 → 55x − 20 = 420 → 55x = 440 → x = 8.',
+    walkthrough:['Scale factor: larger/smaller = 70/50 = 7/5','Set up: (11x−4)/60 = 7/5','Cross-multiply: 5(11x−4) = 420 → 55x = 440 → x = 8'],
   },
 ];
 
