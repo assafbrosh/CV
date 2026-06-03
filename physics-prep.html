@@ -977,6 +977,14 @@
     <h2 id="category-screen-h2">What would you like to study?</h2>
     <p class="cat-subtitle">Choose a subject area to get started</p>
     <div class="category-grid" id="category-grid"></div>
+    <div style="margin-top:1.8rem;padding-top:1.4rem;border-top:1px solid var(--border)">
+      <p style="font-size:.85rem;color:var(--muted);margin-bottom:.7rem">Or import questions from a worksheet:</p>
+      <label id="upload-worksheet-btn-cat" style="cursor:pointer;display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.4rem;border:2px dashed #34a853;border-radius:10px;color:#2d7d3a;font-size:.92rem;font-weight:600;background:#f0faf1;transition:background .15s" onmouseenter="this.style.background='#d8f5db'" onmouseleave="this.style.background='#f0faf1'">
+        📄 Upload Worksheet → Auto-Generate Questions
+        <input type="file" accept=".pdf,.jpg,.jpeg,.png" style="display:none" onchange="uploadWorksheetAndGenerate(this)">
+      </label>
+      <div id="worksheet-gen-status" style="margin-top:.6rem;font-size:.85rem;min-height:1.2em"></div>
+    </div>
   </div>
 
   <!-- SUBJECT SELECTION (within a category) -->
@@ -986,7 +994,13 @@
     </div>
     <h2 id="topic-screen-h2">Choose subjects to practise</h2>
     <div class="topic-grid" id="topic-grid"></div>
-    <button id="start-btn" disabled onclick="startQuiz()">Start Practice</button>
+    <div style="display:flex;gap:.75rem;flex-wrap:wrap;justify-content:center;align-items:center;margin-top:1.2rem">
+      <button id="start-btn" disabled onclick="startQuiz()">Start Practice</button>
+      <label style="cursor:pointer;display:inline-flex;align-items:center;gap:.4rem;padding:.65rem 1.2rem;border:2px dashed #34a853;border-radius:10px;color:#2d7d3a;font-size:.88rem;font-weight:600;background:#f0faf1;transition:background .15s" onmouseenter="this.style.background='#d8f5db'" onmouseleave="this.style.background='#f0faf1'">
+        📄 Upload Worksheet
+        <input type="file" accept=".pdf,.jpg,.jpeg,.png" style="display:none" onchange="uploadWorksheetAndGenerate(this)">
+      </label>
+    </div>
   </div>
 
   <!-- QUIZ -->
@@ -1979,117 +1993,131 @@ const QBANK = [
   // Part 1: Identify the similarity theorem (or "not similar")
   {
     id:'st1', topic:'sim_triangles', type:'mc',
-    question:'△ABC has sides 4, 6, 8. △DEF has sides 6, 9, 12. Are they similar? If so, by which theorem?',
+    question:'Are the two triangles below similar? If so, state the theorem.',
     options:['Yes – SSS similarity','Yes – SAS similarity','Yes – AA similarity','Not similar'],
     answer:0,
     explanation:'Check all three ratios: 4/6 = 6/9 = 8/12 = 2/3. All equal → SSS similarity theorem.',
     walkthrough:['Divide each side of △ABC by the corresponding side of △DEF','4/6 = 2/3, 6/9 = 2/3, 8/12 = 2/3','All three ratios are equal → SSS similarity with scale factor 2:3'],
+    diagram:{"type":"similar_triangles","t1":{"a":"4","b":"6","c":"8","label":"△ABC"},"t2":{"a":"6","b":"9","c":"12","label":"△DEF"}},
   },
   {
     id:'st2', topic:'sim_triangles', type:'mc',
-    question:'△PQR has sides 5, 8, 11. △XYZ has sides 10, 16, 21. Are they similar?',
+    question:'Are the two triangles below similar?',
     options:['Not similar','Yes – SSS similarity','Yes – SAS similarity','Yes – AA similarity'],
     answer:0,
-    explanation:'Check ratios: 5/10 = 0.5, 8/16 = 0.5, but 11/21 ≈ 0.524 ≠ 0.5. Ratios are not all equal, so the triangles are NOT similar.',
+    explanation:'Check ratios: 5/10 = 0.5, 8/16 = 0.5, but 11/21 ≈ 0.524 ≠ 0.5. Ratios are not all equal → NOT similar.',
     walkthrough:['Compute 5/10 = 1/2','Compute 8/16 = 1/2','Compute 11/21 ≈ 0.524 ≠ 1/2 → ratios not equal → not similar'],
+    diagram:{"type":"similar_triangles","t1":{"a":"5","b":"8","c":"11","label":"△PQR"},"t2":{"a":"10","b":"16","c":"21","label":"△XYZ"}},
   },
   {
     id:'st3', topic:'sim_triangles', type:'mc',
-    question:'Both △ABC and △DEF contain angles of 47° and 63°. Are the triangles similar?',
+    question:'Both triangles below have angles of 47° and 63°. Are they similar?',
     options:['Yes – AA similarity','Yes – SSS similarity','Not similar – need side lengths too','Yes – SAS similarity'],
     answer:0,
-    explanation:'The third angle of each triangle = 180° − 47° − 63° = 70°. All three angles match → AA similarity (no side lengths needed).',
+    explanation:'The third angle of each = 180° − 47° − 63° = 70°. All three angles match → AA similarity.',
     walkthrough:['Third angle of △ABC = 180 − 47 − 63 = 70°','Third angle of △DEF = 70° (same)','Two pairs of equal angles → AA similarity theorem'],
+    diagram:{"type":"similar_triangles","t1":{"angleA":"47°","angleB":"63°","angleC":"70°","label":"△ABC"},"t2":{"angleA":"47°","angleB":"63°","angleC":"70°","label":"△DEF"}},
   },
   {
     id:'st4', topic:'sim_triangles', type:'mc',
-    question:'△LMN has sides 7 and 10 with an included angle of 50°. △PQR has sides 14 and 20 with an included angle of 50°. Are they similar?',
+    question:'The two triangles below each have an included angle of 50°. Are they similar?',
     options:['Yes – SAS similarity','Not similar','Yes – SSS similarity','Yes – AA similarity'],
     answer:0,
-    explanation:'Ratios of corresponding sides: 7/14 = 1/2 and 10/20 = 1/2. Equal ratios PLUS the same included angle (50°) → SAS similarity.',
-    walkthrough:['Check side ratios: 7/14 = 1/2, 10/20 = 1/2 ✓','Included angle is 50° in both triangles ✓','Two sides in equal ratio with equal included angle → SAS similarity'],
+    explanation:'7/14 = 1/2 and 10/20 = 1/2 — equal ratios with the same included angle (50°) → SAS similarity.',
+    walkthrough:['Side ratios: 7/14 = 1/2, 10/20 = 1/2 ✓','Included angle 50° matches ✓','→ SAS similarity'],
+    diagram:{"type":"similar_triangles","t1":{"b":"7","c":"10","angleA":"50°","label":"△LMN"},"t2":{"b":"14","c":"20","angleA":"50°","label":"△PQR"}},
   },
   {
     id:'st5', topic:'sim_triangles', type:'mc',
-    question:'△ABC has sides 3 and 5 around a 40° angle. △DEF has sides 6 and 9 around a 40° angle. Are they similar?',
+    question:'The two triangles below both have a 40° included angle. Are they similar?',
     options:['Not similar','Yes – SAS similarity','Yes – SSS similarity','Yes – AA similarity'],
     answer:0,
-    explanation:'For SAS similarity, BOTH side ratios must be equal. 3/6 = 1/2 but 5/9 ≈ 0.556 ≠ 1/2. The included angle alone is not enough if the side ratios differ.',
-    walkthrough:['Check ratios: 3/6 = 1/2','Check ratios: 5/9 ≈ 0.556','Ratios are unequal even though the included angle matches → SAS does NOT apply → not similar'],
+    explanation:'3/6 = 1/2 but 5/9 ≈ 0.556 ≠ 1/2. Side ratios unequal → SAS does NOT apply → not similar.',
+    walkthrough:['3/6 = 1/2','5/9 ≈ 0.556 ≠ 1/2','Unequal ratios even with matching angle → not similar'],
+    diagram:{"type":"similar_triangles","t1":{"b":"3","c":"5","angleA":"40°","label":"△ABC"},"t2":{"b":"6","c":"9","angleA":"40°","label":"△DEF"}},
   },
   {
     id:'st6', topic:'sim_triangles', type:'mc',
-    question:'△RST has sides 8, 12, 16. △UVW has sides 10, 15, 20. Are they similar? If so, by which theorem?',
+    question:'Are the two triangles below similar? If so, state the theorem.',
     options:['Yes – SSS similarity','Not similar','Yes – AA similarity','Yes – SAS similarity'],
     answer:0,
-    explanation:'8/10 = 4/5, 12/15 = 4/5, 16/20 = 4/5. All three ratios equal → SSS similarity with scale factor 4:5.',
+    explanation:'8/10 = 4/5, 12/15 = 4/5, 16/20 = 4/5. All ratios equal → SSS similarity (scale factor 4:5).',
     walkthrough:['8/10 = 4/5','12/15 = 4/5','16/20 = 4/5 → all equal → SSS similarity'],
+    diagram:{"type":"similar_triangles","t1":{"a":"8","b":"12","c":"16","label":"△RST"},"t2":{"a":"10","b":"15","c":"20","label":"△UVW"}},
   },
   {
     id:'st7', topic:'sim_triangles', type:'mc',
     question:'△ABC and △DEF each have ONE angle equal to 35°. Can you conclude the triangles are similar?',
     options:['No – at least two pairs of equal angles are needed (AA)','Yes – one equal angle is enough','Yes – by SAS similarity','Yes – by SSS similarity'],
     answer:0,
-    explanation:'AA similarity requires TWO pairs of equal angles. One matching angle is not sufficient to guarantee similarity.',
-    walkthrough:['AA theorem: need 2 pairs of equal angles','One shared angle could appear in triangles that are very different in shape','Cannot conclude similar from one angle alone'],
+    explanation:'AA similarity requires TWO pairs of equal angles. One matching angle is not sufficient.',
+    walkthrough:['AA theorem: need 2 pairs of equal angles','One shared angle could appear in triangles that look completely different','Cannot conclude similar from one angle alone'],
+    diagram:null,
   },
   {
     id:'st8', topic:'sim_triangles', type:'mc',
-    question:'△ABC has sides 15, 20, 25. △DEF has sides 9, 12, 15. Are they similar?',
+    question:'Are the two triangles below similar?',
     options:['Yes – SSS similarity','Not similar','Yes – AA similarity','Yes – SAS similarity'],
     answer:0,
-    explanation:'15/9 = 5/3, 20/12 = 5/3, 25/15 = 5/3. All equal → SSS similarity. Both are scaled versions of the 3-4-5 right triangle.',
-    walkthrough:['15/9 = 5/3','20/12 = 5/3','25/15 = 5/3 → all equal → SSS similarity (scale factor 5:3)'],
+    explanation:'15/9 = 5/3, 20/12 = 5/3, 25/15 = 5/3. All equal → SSS similarity. Both are 3-4-5 right triangles scaled differently.',
+    walkthrough:['15/9 = 5/3','20/12 = 5/3','25/15 = 5/3 → SSS similarity (scale 5:3)'],
+    diagram:{"type":"similar_triangles","t1":{"a":"15","b":"20","c":"25","label":"△ABC"},"t2":{"a":"9","b":"12","c":"15","label":"△DEF"}},
   },
 
   // Part 2: Find the missing length
   {
     id:'st9', topic:'sim_triangles', type:'mc',
-    question:'△ABC ~ △DEF. AB = 8, BC = 12, DE = 6. Find EF.',
+    question:'△ABC ~ △DEF. Find EF.',
     options:['8','9','10','12'],
     answer:1,
-    explanation:'Scale factor = DE/AB = 6/8 = 3/4. EF = BC × (3/4) = 12 × 3/4 = 9.',
-    walkthrough:['Identify the scale factor: DE/AB = 6/8 = 3/4','Apply to the corresponding side: EF = BC × scale factor','EF = 12 × 3/4 = 9'],
+    explanation:'Scale factor = DE/AB = 6/8 = 3/4. EF = BC × 3/4 = 12 × 3/4 = 9.',
+    walkthrough:['Scale factor = DE/AB = 6/8 = 3/4','EF = BC × scale factor = 12 × 3/4 = 9'],
+    diagram:{"type":"similar_triangles","t1":{"b":"8","c":"12","label":"△ABC (AB=8, BC=12)"},"t2":{"b":"6","c":"?","label":"△DEF (DE=6, EF=?)"}},
   },
   {
     id:'st10', topic:'sim_triangles', type:'mc',
-    question:'△PQR ~ △XYZ. PQ = 10, QR = 15, XY = 4. Find YZ.',
+    question:'△PQR ~ △XYZ. Find YZ.',
     options:['5','6','7','8'],
     answer:1,
-    explanation:'Scale factor = XY/PQ = 4/10 = 2/5. YZ = QR × (2/5) = 15 × 2/5 = 6.',
-    walkthrough:['Scale factor = 4/10 = 2/5','YZ corresponds to QR','YZ = 15 × 2/5 = 6'],
+    explanation:'Scale factor = XY/PQ = 4/10 = 2/5. YZ = QR × 2/5 = 15 × 2/5 = 6.',
+    walkthrough:['Scale factor = 4/10 = 2/5','YZ = 15 × 2/5 = 6'],
+    diagram:{"type":"similar_triangles","t1":{"b":"10","c":"15","label":"△PQR"},"t2":{"b":"4","c":"?","label":"△XYZ (YZ=?)"}},
   },
   {
     id:'st11', topic:'sim_triangles', type:'mc',
-    question:'Two similar triangles: the first has sides 5, ?, 13. The second (larger) has sides 15, 36, 39. Find the missing side of the first triangle.',
+    question:'The triangles below are similar. Find the missing side (?) in the smaller triangle.',
     options:['10','11','12','14'],
     answer:2,
-    explanation:'Matching sides: 5↔15 (ratio 1:3), 13↔39 (ratio 1:3). So the missing side = 36 ÷ 3 = 12.',
-    walkthrough:['Scale factor: 15/5 = 3 and 39/13 = 3 ✓','The side 36 in the larger triangle corresponds to the missing side in the smaller one','Missing side = 36/3 = 12'],
+    explanation:'5↔15 (×3), 13↔39 (×3). Missing side = 36 ÷ 3 = 12.',
+    walkthrough:['Scale factor: 15/5 = 3 and 39/13 = 3','Missing = 36 ÷ 3 = 12'],
+    diagram:{"type":"similar_triangles","t1":{"a":"5","b":"?","c":"13","label":"Smaller"},"t2":{"a":"15","b":"36","c":"39","label":"Larger"}},
   },
   {
     id:'st12', topic:'sim_triangles', type:'mc',
-    question:'△ABC ~ △DEF. AB = 21, BC = 28, DE = 9. Find EF.',
+    question:'△ABC ~ △DEF. Find EF.',
     options:['10','12','14','16'],
     answer:1,
-    explanation:'Scale factor = DE/AB = 9/21 = 3/7. EF = BC × (3/7) = 28 × 3/7 = 12.',
+    explanation:'Scale factor = DE/AB = 9/21 = 3/7. EF = BC × 3/7 = 28 × 3/7 = 12.',
     walkthrough:['Scale factor = 9/21 = 3/7','EF = 28 × 3/7 = 12'],
+    diagram:{"type":"similar_triangles","t1":{"b":"21","c":"28","label":"△ABC"},"t2":{"b":"9","c":"?","label":"△DEF (EF=?)"}},
   },
   {
     id:'st13', topic:'sim_triangles', type:'mc',
-    question:'The ratio of similarity between two triangles is 3:5. A side of the smaller triangle is 18. What is the corresponding side of the larger triangle?',
+    question:'The ratio of similarity is 3:5. The smaller triangle has a side of 18. Find the corresponding side of the larger triangle.',
     options:['24','27','30','33'],
     answer:2,
-    explanation:'Let the larger side = x. 18/x = 3/5. Cross-multiply: 3x = 90, x = 30.',
-    walkthrough:['Set up proportion: smaller/larger = 3/5','18/x = 3/5','Cross-multiply: 3x = 90, so x = 30'],
+    explanation:'18/x = 3/5 → 3x = 90 → x = 30.',
+    walkthrough:['Set up: 18/x = 3/5','Cross-multiply: 3x = 90','x = 30'],
+    diagram:{"type":"similar_triangles","t1":{"c":"18","label":"Smaller (ratio 3)"},"t2":{"c":"?","label":"Larger (ratio 5)"}},
   },
   {
     id:'st14', topic:'sim_triangles', type:'mc',
-    question:'△JKL ~ △PQR. JK = 35, KL = 28, PQ = 25. Find QR.',
+    question:'△JKL ~ △PQR. Find QR.',
     options:['16','18','20','22'],
     answer:2,
-    explanation:'Scale factor = PQ/JK = 25/35 = 5/7. QR = KL × (5/7) = 28 × 5/7 = 20.',
+    explanation:'Scale factor = PQ/JK = 25/35 = 5/7. QR = KL × 5/7 = 28 × 5/7 = 20.',
     walkthrough:['Scale factor = 25/35 = 5/7','QR = 28 × 5/7 = 20'],
+    diagram:{"type":"similar_triangles","t1":{"b":"35","c":"28","label":"△JKL"},"t2":{"b":"25","c":"?","label":"△PQR (QR=?)"}},
   },
 
   // Part 3: Solve for x
@@ -3208,10 +3236,11 @@ function finishScrollQuiz() {
 function renderDiagramSVG(d) {
   if (!d || !d.type) return '';
   try {
-    if (d.type === 'right_triangle') return _svgRightTriangle(d);
-    if (d.type === 'triangle')       return _svgTriangle(d);
-    if (d.type === 'coordinate')     return _svgCoordinate(d);
-    if (d.type === 'circle')         return _svgCircle(d);
+    if (d.type === 'right_triangle')    return _svgRightTriangle(d);
+    if (d.type === 'triangle')          return _svgTriangle(d);
+    if (d.type === 'similar_triangles') return _svgSimilarTriangles(d);
+    if (d.type === 'coordinate')        return _svgCoordinate(d);
+    if (d.type === 'circle')            return _svgCircle(d);
   } catch(e) { return ''; }
   return '';
 }
@@ -3307,6 +3336,76 @@ function _svgCircle(d) {
   }
   if (d.label) s += `<text x="${cx}" y="${cy+r+18}" font-size="13" fill="#5f6368" text-anchor="middle">${d.label}</text>`;
   return s + '</svg>';
+}
+
+function _svgSimilarTriangles(d) {
+  // d.t1 / d.t2 = { a, b, c, angleA, angleB, angleC, label, vA, vB, vC }
+  // vA/vB/vC = optional custom vertex labels; a=right side, b=left side, c=base
+  // Renders two labeled scalene triangles side-by-side with a ~ symbol between them
+
+  // Helper: label a side at the midpoint, offset perpendicularly outward
+  function sideLabel(x1,y1, x2,y2, val, outside, fill) {
+    if (!val) return '';
+    const mx=(x1+x2)/2, my=(y1+y2)/2;
+    const dx=x2-x1, dy=y2-y1, len=Math.sqrt(dx*dx+dy*dy)||1;
+    // perpendicular unit vector, pointing outward (away from triangle interior)
+    const nx=-dy/len*14*outside, ny=dx/len*14*outside;
+    return `<text x="${(mx+nx).toFixed(1)}" y="${(my+ny+4).toFixed(1)}" font-size="13" fill="${fill}" font-weight="700" text-anchor="middle">${val}</text>`;
+  }
+  // Helper: vertex label offset away from triangle
+  function vLabel(px,py, ox,oy, name, fill) {
+    return `<text x="${(px+ox).toFixed(1)}" y="${(py+oy).toFixed(1)}" font-size="12" fill="${fill}" font-weight="700" text-anchor="middle">${name}</text>`;
+  }
+  // Helper: angle arc at a vertex
+  function angleArc(vx,vy, p1x,p1y, p2x,p2y, val, r, fill) {
+    if (!val) return '';
+    // Just draw a small arc label near the vertex
+    const a1=Math.atan2(p1y-vy,p1x-vx), a2=Math.atan2(p2y-vy,p2x-vx);
+    const am=(a1+a2)/2;
+    const tx=(vx+Math.cos(am)*r*1.8).toFixed(1), ty=(vy+Math.sin(am)*r*1.8+4).toFixed(1);
+    // small arc
+    const sx=(vx+Math.cos(a1)*r).toFixed(1), sy=(vy+Math.sin(a1)*r).toFixed(1);
+    const ex=(vx+Math.cos(a2)*r).toFixed(1), ey=(vy+Math.sin(a2)*r).toFixed(1);
+    const large = Math.abs(a2-a1)>Math.PI?1:0;
+    return `<path d="M${sx},${sy} A${r},${r} 0 ${large},1 ${ex},${ey}" fill="none" stroke="${fill}" stroke-width="1.3"/>
+            <text x="${tx}" y="${ty}" font-size="11" fill="${fill}" text-anchor="middle">${val}</text>`;
+  }
+
+  function drawTriangle(t, ox, col, inside) {
+    if (!t) return '';
+    // Use slightly scalene proportions for visual variety
+    // Vertices: A=bottom-left, B=bottom-right, C=top
+    const W=220, H=165, pad=30;
+    const Ax=ox+pad,    Ay=H-pad;
+    const Bx=ox+W-pad,  By=H-pad;
+    const Cx=ox+W*0.38, Cy=pad+8;
+    const vA=t.vA||'A', vB=t.vB||'B', vC=t.vC||'C';
+    let s = `<polygon points="${Ax},${Ay} ${Bx},${By} ${Cx},${Cy}" fill="#f0f4ff" stroke="${col}" stroke-width="2"/>`;
+    // side labels: c=AB (base), b=AC (left), a=BC (right)
+    s += sideLabel(Ax,Ay, Bx,By, t.c,  1, '#202124');  // base (below)
+    s += sideLabel(Bx,By, Cx,Cy, t.a, inside, '#202124'); // right side
+    s += sideLabel(Ax,Ay, Cx,Cy, t.b, -inside, '#202124'); // left side
+    // angle labels / arcs at each vertex
+    s += angleArc(Ax,Ay, Bx,By, Cx,Cy, t.angleA, 18, col);
+    s += angleArc(Bx,By, Ax,Ay, Cx,Cy, t.angleB, 18, col);
+    s += angleArc(Cx,Cy, Ax,Ay, Bx,By, t.angleC, 18, col);
+    // vertex name labels (offset outward from each corner)
+    s += vLabel(Ax,Ay, -14, 6, vA, '#444');
+    s += vLabel(Bx,By,  14, 6, vB, '#444');
+    s += vLabel(Cx,Cy,   0,-12, vC, '#444');
+    // optional triangle name below
+    if (t.label) s += `<text x="${ox+W/2}" y="${H+14}" font-size="12" fill="#5f6368" text-anchor="middle">${t.label}</text>`;
+    return s;
+  }
+
+  const W=520, H=195;
+  let s = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:520px;display:block;margin:0 auto">`;
+  s += drawTriangle(d.t1||{}, 0,   '#1a73e8',  1);
+  s += drawTriangle(d.t2||{}, 280, '#e37400', -1);
+  // ~ separator
+  s += `<text x="258" y="${H/2-10}" font-size="26" fill="#34a853" font-weight="700" text-anchor="middle">~</text>`;
+  s += '</svg>';
+  return s;
 }
 
 // ── DIAGRAM FORM ──────────────────────────────────────────────────────────────
@@ -5966,6 +6065,210 @@ function loadBuiltinOverrides() {
     }
   } catch(e) {}
 }
+// ── UPLOAD WORKSHEET & GENERATE QUESTIONS ─────────────────────────────────────
+async function uploadWorksheetAndGenerate(input) {
+  const file = input.files?.[0];
+  input.value = '';
+  if (!file) return;
+
+  // Status element lives on the category screen; navigate there so it's visible
+  _setScreenVisibility('category-screen');
+  const statusEl = document.getElementById('worksheet-gen-status');
+  const setStatus = (msg, color = '#555') => { if(statusEl) statusEl.innerHTML = `<span style="color:${color}">${msg}</span>`; };
+
+  const provider   = getAIProvider();
+  const storageKey = provider === 'openai' ? 'physPrepAIKey' : 'physPrepAIKeyAnthropic';
+  const apiKey     = (localStorage.getItem(storageKey) || '').trim();
+  if (!apiKey) {
+    setStatus(`❌ No ${provider === 'openai' ? 'OpenAI' : 'Anthropic'} API key set — add it in AI Settings.`, '#c62828');
+    return;
+  }
+
+  setStatus('⏳ Reading file…');
+
+  // Convert file to base64 data URL
+  const dataUrl = await new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = e => res(e.target.result);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+
+  // For PDFs, render pages to images; for images, use directly
+  const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+  const imagePayloads = [];
+
+  if (isPdf) {
+    setStatus('⏳ Rendering PDF pages…');
+    try {
+      const pages = await pdfToImages(dataUrl, 6, (p, tot) => setStatus(`⏳ Rendering page ${p}/${tot}…`));
+      pages.forEach(data => imagePayloads.push({ media_type: 'image/jpeg', data }));
+    } catch(e) {
+      setStatus('❌ Could not read PDF. Try saving as JPG/PNG.', '#c62828');
+      return;
+    }
+  } else {
+    const mimeType = file.type || 'image/jpeg';
+    imagePayloads.push({ media_type: mimeType, data: dataUrl.split(',')[1] });
+  }
+
+  if (!imagePayloads.length) {
+    setStatus('❌ No content could be extracted from the file.', '#c62828');
+    return;
+  }
+
+  setStatus('⏳ Analysing worksheet with AI… (this may take ~30 s)');
+
+  const worksheetPrompt = `You are an expert teacher. A student has uploaded a math/science worksheet. Analyse ALL pages of the worksheet shown in the images and generate questions equivalent to those in the worksheet.
+
+CRITICAL RULES:
+1. Match the EXACT question types from the worksheet (e.g. if it has "find missing side", "solve for x", "identify similarity theorem" — generate those same types)
+2. Use fresh numbers/values — do NOT copy the worksheet directly
+3. Generate at least 15 questions total
+4. Include a short topicLabel (e.g. "Similar Triangles"), subjectId (must be exactly one of: "math", "physics", or "chemistry"), and a brief theory paragraph
+
+DIAGRAM RULES — choose the most appropriate diagram per question:
+
+Similar-triangles pair (use whenever comparing two triangles):
+{"type":"similar_triangles","t1":{"a":"side BC","b":"side AC","c":"side AB","angleA":"angle or ''","angleB":"angle or ''","angleC":"angle or ''","label":"△ABC"},"t2":{"a":"side EF","b":"side DF","c":"side DE","angleA":"","angleB":"","angleC":"","label":"△DEF"}}
+(a=right side, b=left side, c=bottom side; use "" for unknown/unlabelled; use "?" for the value being found)
+
+Single triangle (one triangle with labelled sides/angles):
+{"type":"triangle","a":"right side","b":"left side","c":"bottom","angleA":"","angleB":"","angleC":""}
+
+Right triangle:
+{"type":"right_triangle","a":"opposite","b":"adjacent","c":"hypotenuse","angleA":"","angleB":"","highlight":"a|b|c"}
+
+Coordinate plane:
+{"type":"coordinate","points":[{"x":1,"y":2,"label":"A"}],"line":[{"x":1,"y":2},{"x":3,"y":4}]}
+
+Circle:
+{"type":"circle","radius":"r","showDiameter":true,"diameter":"d"}
+
+No diagram: "diagram":null
+
+Return ONLY valid JSON — no markdown, no explanation:
+{
+  "topicLabel": "...",
+  "subjectId": "math",
+  "icon": "🔺",
+  "theory": "<p>Brief theory HTML here</p>",
+  "questions": [
+    {
+      "type": "mc",
+      "question": "Question text",
+      "options": ["A","B","C","D"],
+      "answer": 0,
+      "explanation": "Why correct",
+      "walkthrough": ["Step 1","Step 2"],
+      "diagram": null
+    }
+  ]
+}`;
+
+  try {
+    let responseText;
+
+    if (provider === 'anthropic') {
+      const content = [{ type: 'text', text: worksheetPrompt }];
+      imagePayloads.forEach(({ media_type, data }) => {
+        content.push({ type: 'image', source: { type: 'base64', media_type, data } });
+      });
+      const res = await _aiFetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 8000,
+          messages: [{ role: 'user', content }],
+        }),
+      });
+      if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e?.error?.message || `HTTP ${res.status}`); }
+      const json = await res.json();
+      responseText = json.content?.[0]?.text || '';
+    } else {
+      const userContent = [{ type: 'text', text: worksheetPrompt }];
+      imagePayloads.forEach(({ media_type, data }) => {
+        userContent.push({ type: 'image_url', image_url: { url: `data:${media_type};base64,${data}`, detail: 'high' } });
+      });
+      const res = await _aiFetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          max_tokens: 8000,
+          messages: [
+            { role: 'system', content: 'You analyse math/science worksheets and generate equivalent quiz questions. Return only valid JSON.' },
+            { role: 'user', content: userContent },
+          ],
+        }),
+      });
+      if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e?.error?.message || `HTTP ${res.status}`); }
+      const json = await res.json();
+      responseText = json.choices?.[0]?.message?.content || '';
+    }
+
+    // Parse AI response
+    const jsonStr = responseText.replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'').trim();
+    let result;
+    try { result = JSON.parse(jsonStr); } catch(e) {
+      // Try to extract JSON object from response
+      const m = responseText.match(/\{[\s\S]*\}/);
+      if (m) result = JSON.parse(m[0]);
+      else throw new Error('Could not parse AI response as JSON');
+    }
+
+    const questions = result.questions;
+    if (!Array.isArray(questions) || !questions.length) throw new Error('No questions returned');
+
+    // Create new custom topic
+    const topicId = `topic_${Date.now()}`;
+    const subjId = ['math','physics','chemistry'].includes(result.subjectId) ? result.subjectId : 'math';
+
+    // Ensure subject exists
+    if (!SUBJECTS.find(s => s.id === subjId)) {
+      SUBJECTS.push({ id: subjId, label: subjId.charAt(0).toUpperCase()+subjId.slice(1), icon: '📚', color: '#1a73e8', desc: subjId, _builtin: true });
+    }
+
+    const newTopic = {
+      id: topicId,
+      subjectId: subjId,
+      label: result.topicLabel || 'Uploaded Worksheet',
+      icon: result.icon || '📄',
+      desc: `Auto-generated from uploaded worksheet`,
+      theory: result.theory || '',
+      _custom: true,
+    };
+    TOPICS.push(newTopic);
+
+    // Add questions to QBANK
+    const newQuestions = questions.map((q, i) => ({
+      ...q,
+      id: `${topicId}_q${i}_${Date.now()}`,
+      topic: topicId,
+      _aiGenerated: true,
+    }));
+    newQuestions.forEach(q => QBANK.push(q));
+
+    await saveCustomTopics();
+
+    setStatus(`✅ Created "<strong>${newTopic.label}</strong>" with ${newQuestions.length} questions — click it below to start practising!`, '#2d7d3a');
+
+    // Navigate to the new topic's subject so user can select and start
+    buildCategoryGrid();
+    setTimeout(() => showSubjectScreen(subjId), 300);
+
+  } catch(e) {
+    console.error('Worksheet generation error:', e);
+    setStatus(`❌ Error: ${e.message}`, '#c62828');
+  }
+}
+
 async function loadExtraQuestions() {
   let extra = await _bmDB.get('physPrepExtraQuestions').catch(() => null);
   if (!extra) {
