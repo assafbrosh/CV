@@ -4859,7 +4859,7 @@ async function _aiFetch(url, options, timeoutMs = 45000) {
     const res = await fetch(url, { ...options, signal: ctrl.signal });
     return res;
   } catch(e) {
-    if (e.name === 'AbortError') throw new Error('Request timed out after 45s — slow network or API unreachable.');
+    if (e.name === 'AbortError') throw new Error(`Request timed out after ${timeoutMs/1000}s — slow network or API unreachable.`);
     const msg = e.message || 'Failed to fetch';
     throw new Error(`${msg} — possible causes: (1) ad blocker or iCloud Private Relay blocking api.anthropic.com, (2) your network restricts outbound HTTPS. Try: disable VPN/ad-blocker, switch networks, or use OpenAI instead.`);
   } finally {
