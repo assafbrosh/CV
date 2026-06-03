@@ -2298,6 +2298,8 @@ function buildFreshTopicQueue(topicId) {
   return fisherYates(available);
 }
 
+const SESSION_SIZE = 100;
+
 // ── CUSTOM TOPICS — GLOBAL STORAGE ───────────────────────────────────────────
 async function loadCustomTopics() {
   // Try IndexedDB first, then migrate from localStorage
@@ -2491,8 +2493,24 @@ function updateStartBtn() {
 
 function startQuiz() {
   const selected = [...document.querySelectorAll('.topic-card.selected')].map(c => c.dataset.id);
-  const queue = [];
-  selected.forEach(tid => queue.push(...buildFreshTopicQueue(tid)));
+
+  // Build per-topic fresh queues, then interleave and cap at SESSION_SIZE
+  const perTopic = selected.map(tid => buildFreshTopicQueue(tid));
+  let combined = [];
+  // Round-robin interleave so topics are evenly spread through the session
+  const maxLen = Math.max(0, ...perTopic.map(q => q.length));
+  for (let i = 0; i < maxLen; i++) {
+    perTopic.forEach(tq => { if (i < tq.length) combined.push(tq[i]); });
+  }
+  // Cap to SESSION_SIZE; mark the selected questions as used so next session shows different ones
+  const queue = combined.slice(0, SESSION_SIZE);
+  const usedByTopic = {};
+  queue.forEach(q => {
+    if (!usedByTopic[q.topic]) usedByTopic[q.topic] = [];
+    usedByTopic[q.topic].push(q.id);
+  });
+  Object.entries(usedByTopic).forEach(([tid, ids]) => ids.forEach(id => markUsed(tid, id)));
+
   state.queue = queue;
   state.idx = 0; state.correct = 0; state.wrong = 0;
   state.awaitingSimilar = false; state.currentSimilar = null;
