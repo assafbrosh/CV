@@ -6101,7 +6101,7 @@ async function uploadWorksheetAndGenerate(input) {
   if (isPdf) {
     setStatus('⏳ Rendering PDF pages…');
     try {
-      const pages = await pdfToImages(dataUrl, 6, (p, tot) => setStatus(`⏳ Rendering page ${p}/${tot}…`));
+      const pages = await pdfToImages(dataUrl, 4, (p, tot) => setStatus(`⏳ Rendering page ${p}/${tot}…`));
       pages.forEach(data => imagePayloads.push({ media_type: 'image/jpeg', data }));
     } catch(e) {
       setStatus('❌ Could not read PDF. Try saving as JPG/PNG.', '#c62828');
@@ -6187,7 +6187,7 @@ Return ONLY valid JSON — no markdown, no explanation:
           max_tokens: 8000,
           messages: [{ role: 'user', content }],
         }),
-      });
+      }, 120000);
       if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e?.error?.message || `HTTP ${res.status}`); }
       const json = await res.json();
       responseText = json.content?.[0]?.text || '';
@@ -6207,7 +6207,7 @@ Return ONLY valid JSON — no markdown, no explanation:
             { role: 'user', content: userContent },
           ],
         }),
-      });
+      }, 120000);
       if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e?.error?.message || `HTTP ${res.status}`); }
       const json = await res.json();
       responseText = json.choices?.[0]?.message?.content || '';
