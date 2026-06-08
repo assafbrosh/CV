@@ -5070,6 +5070,35 @@ async function findGistByFilename(token) {
   return null;
 }
 
+// Merge cloud-stored custom topics / extra AI questions directly into the local
+// IndexedDB store, adding anything missing locally (matched by id) without
+// clobbering local-only items. Writing straight to _bmDB avoids the broken
+// localStorage→IndexedDB migration path (which only runs when _bmDB is empty).
+// Returns true if anything new was added.
+async function _mergeCloudCustomData(data) {
+  let added = false;
+  try {
+    if (data.physPrepCustom) {
+      const remoteCustoms = typeof data.physPrepCustom === 'string' ? JSON.parse(data.physPrepCustom) : data.physPrepCustom;
+      const localCustoms = (await _bmDB.get('physPrepCustom').catch(() => null)) || [];
+      const byId = {}; localCustoms.forEach(t => byId[t.id] = t);
+      remoteCustoms.forEach(t => { if (!byId[t.id]) { byId[t.id] = t; added = true; } });
+      if (added) await _bmDB.set('physPrepCustom', Object.values(byId)).catch(() => {});
+    }
+  } catch(e) {}
+  try {
+    if (data.physPrepExtraQuestions) {
+      const remoteExtra = typeof data.physPrepExtraQuestions === 'string' ? JSON.parse(data.physPrepExtraQuestions) : data.physPrepExtraQuestions;
+      const localExtra = (await _bmDB.get('physPrepExtraQuestions').catch(() => null)) || [];
+      const byId = {}; localExtra.forEach(q => byId[q.id] = q);
+      let extraAdded = false;
+      remoteExtra.forEach(q => { if (!byId[q.id]) { byId[q.id] = q; extraAdded = true; } });
+      if (extraAdded) { await _bmDB.set('physPrepExtraQuestions', Object.values(byId)).catch(() => {}); added = true; }
+    }
+  } catch(e) {}
+  return added;
+}
+
 async function pullDataFromGitHub(silent) {
   const status = document.getElementById('gh-sync-status');
   let gistId = getGistId();
@@ -5093,9 +5122,10 @@ async function pullDataFromGitHub(silent) {
     const { text } = await fetchGistContent(gistId, token);
     const parsed = JSON.parse(text);
     const data = parsed.data || parsed;
+    await _mergeCloudCustomData(data);
     let count = 0;
     Object.entries(data).forEach(([k, v]) => {
-      if (k.startsWith('physPrep') && k !== 'physPrepGHToken' && k !== 'physPrepGistId' && k !== 'physPrepAIKey' && k !== 'physPrepAIKeyAnthropic' && k !== 'physPrepAIProvider') { localStorage.setItem(k, v); count++; }
+      if (k.startsWith('physPrep') && k !== 'physPrepGHToken' && k !== 'physPrepGistId' && k !== 'physPrepAIKey' && k !== 'physPrepAIKeyAnthropic' && k !== 'physPrepAIProvider' && k !== 'physPrepCustom' && k !== 'physPrepExtraQuestions') { localStorage.setItem(k, v); count++; }
     });
     // Mark local as up-to-date to prevent auto-sync loop on next load
     localStorage.setItem('physPrepLastPush', (parsed.exportedAt || Date.now()).toString());
@@ -5122,19 +5152,26 @@ async function autoSyncOnStartup() {
     const parsed = JSON.parse(text);
     const remoteTs = parsed.exportedAt || 0;
     const localTs = parseInt(localStorage.getItem('physPrepLastPush') || '0');
+    const data = parsed.data || parsed;
+
+    // Always merge custom topics / extra AI questions from the cloud — even if
+    // our local push timestamp looks newer — so a device that pushed stale data
+    // (without another device's newly-uploaded topic) doesn't hide it forever.
+    const merged = await _mergeCloudCustomData(data);
+
     if (remoteTs <= localTs) {
-      _showSyncBadge('☁️ Up to date');
+      if (merged) { _showSyncBadge('☁️ Synced new topics'); setTimeout(() => location.reload(), 600); }
+      else _showSyncBadge('☁️ Up to date');
       return;
     }
     _showSyncBadge('☁️ Syncing…');
-    const data = parsed.data || parsed;
     let count = 0;
     Object.entries(data).forEach(([k, v]) => {
-      if (k.startsWith('physPrep') && k !== 'physPrepGHToken' && k !== 'physPrepGistId' && k !== 'physPrepAIKey' && k !== 'physPrepAIKeyAnthropic' && k !== 'physPrepAIProvider') { localStorage.setItem(k, v); count++; }
+      if (k.startsWith('physPrep') && k !== 'physPrepGHToken' && k !== 'physPrepGistId' && k !== 'physPrepAIKey' && k !== 'physPrepAIKeyAnthropic' && k !== 'physPrepAIProvider' && k !== 'physPrepCustom' && k !== 'physPrepExtraQuestions') { localStorage.setItem(k, v); count++; }
     });
     // Mark local as up-to-date so we don't reload on next visit
     localStorage.setItem('physPrepLastPush', remoteTs.toString());
-    if (count > 0) {
+    if (count > 0 || merged) {
       _showSyncBadge(`☁️ Synced ${count} items`);
       setTimeout(() => location.reload(), 600);
     }
